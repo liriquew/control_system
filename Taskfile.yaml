@@ -1,0 +1,20 @@
+version: "3"
+
+tasks:
+  make_migration:
+    aliases:
+      - make_migration
+    cmds:
+      - migrate -path migrations -database "postgresql://postgres:passw0rd@localhost:5432/control_system?sslmode=disable" -verbose up
+
+  gen_python_proto:
+    aliases:
+      - gen_py
+    cmds:
+      - python -m grpc_tools.protoc -I proto proto/predictions_service/*.proto --python_out=./predictions_service --grpc_python_out=./predictions_service --pyi_out=./predictions_service --proto_path=./predictions_service
+
+  gen_golang_proto:
+    aliases:
+      - gen_go
+    cmds:
+      - protoc -I proto proto/predictions_service/*.proto --go_out=./proto/gen --go_opt=paths=source_relative --go-grpc_out=./proto/gen --go-grpc_opt=paths=source_relative

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package predictions;
+
+option go_package = "control_system.api;predictions";
+
+service Predictions {
+    rpc RecalculateAndSaveTask (RecalculateAndSaveTaskRequest) returns (RecalculateAndSaveTaskResponse);
+    rpc Recalculete (RecalculateRequest) returns (RecalculateResponse);
+    rpc Predict (PredictRequest) returns (PredictResponse);
+}
+
+message RecalculateAndSaveTaskRequest {
+    int64 ID = 1;
+    int64 UID = 2;
+    string Title = 3;
+    string Description = 4;
+    double PlannedTime = 5;
+    double ActualTime = 6;
+}
+
+message RecalculateAndSaveTaskResponse {
+    string Status = 1;
+}
+
+message RecalculateRequest {
+    int64 UID = 1;
+}
+
+message RecalculateResponse {
+    string Status = 1;
+}
+
+message PredictRequest {
+    int64 UID = 1;
+    double PlannedTime = 2;
+}
+
+message PredictResponse {
+    double ActualTime = 1;
+    string Status = 2;
+}
