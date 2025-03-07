@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
+	"time_manage/internal/config"
 	predictions "time_manage/internal/grpc/gen"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
@@ -23,18 +24,16 @@ type Client struct {
 	log *log.Logger
 }
 
-func New(log *log.Logger) (*Client, error) {
+func New(log *log.Logger, cfg *config.ServiceConfig) (*Client, error) {
 	retryOpts := []grpcretry.CallOption{
 		grpcretry.WithCodes(codes.NotFound, codes.Aborted, codes.DeadlineExceeded),
 		grpcretry.WithMax(uint(1)),
 		grpcretry.WithPerRetryTimeout(time.Second),
 	}
 
-	// logOpts := []grpclog.Option{
-	// 	grpclog.WithLogOnEvents(grpclog.PayloadReceived, grpclog.PayloadSent),
-	// }
+	connStr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
-	cc, err := grpc.NewClient("python-server:4041",
+	cc, err := grpc.NewClient(connStr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(
 			// grpclog.UnaryClientInterceptor(InterceptorLogger(log), logOpts...),
@@ -50,12 +49,6 @@ func New(log *log.Logger) (*Client, error) {
 		log: log,
 	}, nil
 }
-
-// func InterceptorLogger(log *log.Logger) grpclog.Logger {
-// 	return grpclog.LoggerFunc(func(ctx context.Context, level grpclog.Level, msg string, fields ...any) {
-// 		log.Log(ctx, slog.Level(level), msg, fields...)
-// 	})
-// }
 
 var (
 	ErrFailedPrecondition = fmt.Errorf("user does not have any completed tasks")

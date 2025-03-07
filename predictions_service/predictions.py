@@ -3,6 +3,7 @@ import numpy as np
 import grpc 
 
 from database import Database, ExceptionDB
+from config import ConfigLoader
 
 class PredicatorException(Exception):
     def __init__(self, message, extra_info):
@@ -35,8 +36,8 @@ class Predicator():
         }
     ]
 
-    def __init__(self):
-        self.db = Database()
+    def __init__(self, config: ConfigLoader):
+        self.db = Database(config.get_database_config())
 
     def get_params(self, n: int):
         '''

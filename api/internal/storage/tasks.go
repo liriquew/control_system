@@ -25,12 +25,12 @@ type Task struct {
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`     // Время создания задачи
 }
 
-func (s *Storage) CreateTask(uid int64, task *Task) (int64, error) {
+func (s *Storage) CreateTask(ctx context.Context, uid int64, task *Task) (int64, error) {
 	query := `INSERT INTO tasks (user_id, title, description, planned_time, actual_time)
 			  VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	fmt.Println(uid, task)
 	err := s.db.QueryRowContext(
-		context.Background(),
+		ctx,
 		query,
 		uid, task.Title, task.Description, task.PlannedTime, nil,
 	).Scan(&task.ID)
@@ -42,7 +42,7 @@ func (s *Storage) CreateTask(uid int64, task *Task) (int64, error) {
 	return task.ID, err
 }
 
-func (s *Storage) GetTaskByID(uid, taskID int64) (*Task, error) {
+func (s *Storage) GetTaskByID(ctx context.Context, uid, taskID int64) (*Task, error) {
 	if taskID <= 0 {
 		return nil, ErrInvalidTaskID
 	}
@@ -50,7 +50,7 @@ func (s *Storage) GetTaskByID(uid, taskID int64) (*Task, error) {
 	query := "SELECT * FROM tasks WHERE user_id=$1 AND id=$2"
 
 	var task Task
-	err := s.db.GetContext(context.Background(), &task, query, uid, taskID)
+	err := s.db.GetContext(ctx, &task, query, uid, taskID)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -62,7 +62,7 @@ func (s *Storage) GetTaskByID(uid, taskID int64) (*Task, error) {
 	return &task, nil
 }
 
-func (s *Storage) UpdateTask(uid, taskID int64, task *Task) error {
+func (s *Storage) UpdateTask(ctx context.Context, uid, taskID int64, task *Task) error {
 	if taskID <= 0 {
 		return ErrInvalidTaskID
 	}
@@ -70,7 +70,7 @@ func (s *Storage) UpdateTask(uid, taskID int64, task *Task) error {
 	query := "UPDATE tasks SET title=$1, description=$2, planned_time=$3, actual_time=$4 WHERE user_id=$5 AND id=$6"
 
 	result, err := s.db.ExecContext(
-		context.Background(),
+		ctx,
 		query,
 		task.Title, task.Description, task.PlannedTime, task.ActualTime, uid, taskID,
 	)
@@ -93,7 +93,7 @@ func (s *Storage) UpdateTask(uid, taskID int64, task *Task) error {
 	return err
 }
 
-func (s *Storage) DeleteTask(uid, taskID int64) error {
+func (s *Storage) DeleteTask(ctx context.Context, uid, taskID int64) error {
 	if taskID <= 0 {
 		return ErrInvalidTaskID
 	}
@@ -101,7 +101,7 @@ func (s *Storage) DeleteTask(uid, taskID int64) error {
 	query := "DELETE FROM tasks WHERE user_id=$1 AND id=$2"
 
 	_, err := s.db.ExecContext(
-		context.Background(),
+		ctx,
 		query,
 		uid, taskID,
 	)

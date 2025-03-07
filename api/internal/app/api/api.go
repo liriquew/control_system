@@ -12,7 +12,6 @@ import (
 func New(authAPI auth.AuthAPI, taskAPI task.TaskAPI) *chi.Mux {
 	r := chi.NewRouter()
 
-	// если где-то что-то пойдет не так (произойдет паника) то все не упадет
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api", func(r chi.Router) {

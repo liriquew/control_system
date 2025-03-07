@@ -73,7 +73,7 @@ func (api *Task) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	api.infoLog.Println(uid)
 
-	taskID, err := api.storage.CreateTask(int64(uid), &task)
+	taskID, err := api.storage.CreateTask(r.Context(), int64(uid), &task)
 	if err != nil {
 		api.errorLog.Println("Storage error:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -98,7 +98,7 @@ func (api *Task) GetTask(w http.ResponseWriter, r *http.Request) {
 	uid := r.Context().Value(auth.UIDInterface{}).(int64)
 	api.infoLog.Println("UID:", uid)
 
-	task, err := api.storage.GetTaskByID(int64(uid), int64(taskID))
+	task, err := api.storage.GetTaskByID(r.Context(), int64(uid), int64(taskID))
 	if err != nil {
 		api.errorLog.Println("Storage error", err)
 		if errors.Is(err, storage.ErrInvalidTaskID) {
@@ -152,7 +152,7 @@ func (api *Task) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// перерасчет не требуется
-		err = api.storage.UpdateTask(int64(uid), int64(taskID), &task)
+		err = api.storage.UpdateTask(r.Context(), int64(uid), int64(taskID), &task)
 		if err != nil {
 			if errors.Is(err, storage.ErrInvalidTaskID) {
 				http.Error(w, "Некорректный taskID", http.StatusBadRequest)
@@ -186,7 +186,7 @@ func (api *Task) DeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	uid := r.Context().Value(auth.UIDInterface{}).(int64)
 
-	err = api.storage.DeleteTask(int64(uid), int64(taskID))
+	err = api.storage.DeleteTask(r.Context(), int64(uid), int64(taskID))
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidTaskID) {
 			http.Error(w, "invalid taskID", http.StatusBadRequest)

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 	"time_manage/internal/app"
+	"time_manage/internal/config"
 	"time_manage/internal/storage"
 )
 
@@ -23,7 +24,9 @@ func main() {
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ltime)
 
-	r := app.New(infoLog, errorLog)
+	cfg := config.MustLoad()
+
+	r := app.New(infoLog, errorLog, cfg)
 
 	srv := &http.Server{
 		Addr:    ":" + "8080",

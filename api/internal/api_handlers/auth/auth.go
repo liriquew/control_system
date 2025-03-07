@@ -49,7 +49,7 @@ func (api *Auth) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userFromStorage, err := api.storage.GetUserByUsername(user.Username)
+	userFromStorage, err := api.storage.GetUserByUsername(r.Context(), user.Username)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
 			http.Error(w, "Пользователь не найден", http.StatusBadRequest)
@@ -88,7 +88,7 @@ func (api *Auth) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	uid, err := api.storage.CreateUser(user.Username, user.Password)
+	uid, err := api.storage.CreateUser(r.Context(), user.Username, user.Password)
 	if err != nil {
 		api.errorLog.Println("Storage error:", err.Error())
 		if errors.Is(storage.ErrUserAlreadyExists, err) {

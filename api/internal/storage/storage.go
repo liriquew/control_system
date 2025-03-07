@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time_manage/internal/config"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -26,9 +27,11 @@ type Storage struct {
 	db *sqlx.DB
 }
 
-func New() (*Storage, error) {
-	connStr := "postgresql://postgres:passw0rd@postgres:5432/control_system?sslmode=disable"
-	// connStr := "postgresql://postgres:passw0rd@localhost:5432/control_system?sslmode=disable"
+func New(cfg *config.StorageConfig) (*Storage, error) {
+	connStr := fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=disable",
+		cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.DBName,
+	)
+
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		return nil, err
@@ -39,13 +42,13 @@ func New() (*Storage, error) {
 	}, nil
 }
 
-func (s *Storage) CreateUser(username, password string) (int64, error) {
+func (s *Storage) CreateUser(ctx context.Context, username, password string) (int64, error) {
 	user := &User{}
 
 	query := "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id"
 
 	err := s.db.QueryRowContext(
-		context.Background(),
+		ctx,
 		query,
 		username, password,
 	).Scan(&user.ID)
@@ -61,11 +64,11 @@ func (s *Storage) CreateUser(username, password string) (int64, error) {
 	return user.ID, nil
 }
 
-func (s *Storage) GetUserByID(uid int64) (*User, error) {
+func (s *Storage) GetUserByID(ctx context.Context, uid int64) (*User, error) {
 	query := "SELECT * FROM users WHERE id = $1"
 
 	var user User
-	err := s.db.Get(&user, query, uid)
+	err := s.db.GetContext(ctx, &user, query, uid)
 
 	if err != nil {
 		// TODO: check error
@@ -78,11 +81,11 @@ func (s *Storage) GetUserByID(uid int64) (*User, error) {
 	return &user, nil
 }
 
-func (s *Storage) GetUserByUsername(username string) (*User, error) {
+func (s *Storage) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	query := "SELECT * FROM users WHERE username = $1"
 
 	var user User
-	err := s.db.Get(&user, query, username)
+	err := s.db.GetContext(ctx, &user, query, username)
 	fmt.Println(user, err)
 
 	if err != nil {

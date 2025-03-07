@@ -13,18 +13,16 @@ class Database():
     """
     Класс для работы с базой данных PostgreSQL
     """
-
-    def __init__(self):
+    def __init__(self, config: dict):
         """
         Подключение к базе данных
         """
         self.conn = psycopg2.connect(
-            dbname="control_system",
-            user="postgres",
-            password="passw0rd",
-            host="postgres"
+            dbname=config["db_name"],
+            user=config["username"],
+            password=config["password"],
+            host=config["host"]
         )
-
 
     def load_model(self, UID: int):
         '''
