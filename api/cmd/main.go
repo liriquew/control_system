@@ -11,13 +11,11 @@ import (
 	"time"
 	"time_manage/internal/app"
 	"time_manage/internal/config"
-	"time_manage/internal/storage"
 )
 
 type API struct {
 	infoLog  *log.Logger
 	errorLog *log.Logger
-	storage  *storage.Storage
 }
 
 func main() {

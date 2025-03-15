@@ -8,6 +8,7 @@ import (
 
 type AppConfig struct {
 	PredictionsService ServiceConfig `yaml:"predictions_service" env-required:"true"`
+	APIService         ServiceConfig `yaml:"api_service" env-required:"true"`
 	Storage            StorageConfig `yaml:"postgres" env-required:"true"`
 }
 

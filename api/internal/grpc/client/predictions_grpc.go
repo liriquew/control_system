@@ -13,10 +13,9 @@ import (
 
 	"time_manage/internal/config"
 	predictions "time_manage/internal/grpc/gen"
+	"time_manage/internal/models"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
-
-	"time_manage/internal/storage"
 )
 
 type Client struct {
@@ -55,7 +54,7 @@ var (
 	ErrInvalidArgument    = fmt.Errorf("invalid argument")
 )
 
-func (c *Client) RecalculateAndSaveTask(ctx context.Context, uid int64, task *storage.Task) error {
+func (c *Client) RecalculateAndSaveTask(ctx context.Context, uid int64, task *models.Task) error {
 	const op = "predictions_client.RecalculateAndSaveTask"
 
 	_, err := c.api.RecalculateAndSaveTask(ctx, &predictions.RecalculateAndSaveTaskRequest{

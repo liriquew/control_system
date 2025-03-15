@@ -8,31 +8,32 @@ import (
 	"net/http"
 	"strconv"
 	"time_manage/internal/api_handlers/auth"
-	predictions_client "time_manage/internal/grpc/client"
-	"time_manage/internal/storage"
+	"time_manage/internal/models"
+	service "time_manage/internal/service/tasks"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type TaskAPI interface {
 	CreateTask(w http.ResponseWriter, r *http.Request)
 	GetTask(w http.ResponseWriter, r *http.Request)
+	GetTaskList(w http.ResponseWriter, r *http.Request)
 	UpdateTask(w http.ResponseWriter, r *http.Request)
 	DeleteTask(w http.ResponseWriter, r *http.Request)
 	Predict(w http.ResponseWriter, r *http.Request)
 }
 
 type Task struct {
-	infoLog    *log.Logger
-	errorLog   *log.Logger
-	storage    *storage.Storage
-	taskClient *predictions_client.Client
+	infoLog     *log.Logger
+	errorLog    *log.Logger
+	taskService *service.TaskService
 }
 
-func New(infoLog *log.Logger, errorLog *log.Logger, storage *storage.Storage, taskClient *predictions_client.Client) *Task {
+func New(infoLog *log.Logger, errorLog *log.Logger, taskService *service.TaskService) *Task {
 	return &Task{
-		infoLog:    infoLog,
-		errorLog:   errorLog,
-		storage:    storage,
-		taskClient: taskClient,
+		infoLog:     infoLog,
+		errorLog:    errorLog,
+		taskService: taskService,
 	}
 }
 
@@ -61,53 +62,54 @@ type ResponseActualTime struct {
 }
 
 func (api *Task) CreateTask(w http.ResponseWriter, r *http.Request) {
-	api.infoLog.Println("Create Task")
-
-	var task storage.Task
-	err := json.NewDecoder(r.Body).Decode(&task)
+	task, err := models.TaskModelFromJson(r.Body)
 	if err != nil {
 		api.errorLog.Println("JSON error", err)
 		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
 	}
-	uid := r.Context().Value(auth.UIDInterface{}).(int64)
+	task.UserID = r.Context().Value(auth.UIDInterface{}).(int64)
 
-	api.infoLog.Println(uid)
-
-	taskID, err := api.storage.CreateTask(r.Context(), int64(uid), &task)
+	task, err = api.taskService.CreateTask(r.Context(), task)
 	if err != nil {
-		api.errorLog.Println("Storage error:", err)
+		if errors.Is(err, service.ErrBadTaskTile) {
+			http.Error(w, "invalid title", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, service.ErrBadTaskDescription) {
+			http.Error(w, "invalid description", http.StatusBadRequest)
+			return
+		}
+		api.errorLog.Println("Service error:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ResponseID{ID: Int64String(taskID)})
+	api.infoLog.Println(task)
+	json.NewEncoder(w).Encode(ResponseID{ID: Int64String(task.ID)})
 }
 
 func (api *Task) GetTask(w http.ResponseWriter, r *http.Request) {
-	api.infoLog.Println("Get Task")
-
-	taskIDStr := r.URL.Query().Get("taskid")
-	taskID, err := strconv.Atoi(taskIDStr)
-	api.infoLog.Println(taskID, err)
+	taskID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		http.Error(w, "Некорректный taskID", http.StatusBadRequest)
+		http.Error(w, "incorrect taskID", http.StatusBadRequest)
 		return
 	}
+	userID := r.Context().Value(auth.UIDInterface{}).(int64)
 
-	uid := r.Context().Value(auth.UIDInterface{}).(int64)
-	api.infoLog.Println("UID:", uid)
-
-	task, err := api.storage.GetTaskByID(r.Context(), int64(uid), int64(taskID))
+	task, err := api.taskService.GetTaskByID(r.Context(), userID, int64(taskID))
 	if err != nil {
-		api.errorLog.Println("Storage error", err)
-		if errors.Is(err, storage.ErrInvalidTaskID) {
-			http.Error(w, "Некорректный taskID", http.StatusBadRequest)
-			return
-		} else if errors.Is(err, storage.ErrTaskNotFound) {
-			http.Error(w, "Задача с таким taskID не найдена", http.StatusBadRequest)
+		if errors.Is(err, service.ErrInvalidTaskID) {
+			http.Error(w, "incorrect taskID", http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, service.ErrTaskNotFound) {
+			http.Error(w, "task not found", http.StatusNotFound)
+			return
+		}
+
+		api.errorLog.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -116,52 +118,83 @@ func (api *Task) GetTask(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(task)
 }
 
-func (api *Task) UpdateTask(w http.ResponseWriter, r *http.Request) {
-	api.infoLog.Println("Update Task")
+func (api *Task) GetTaskList(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(auth.UIDInterface{}).(int64)
+	var err error
 
-	taskIDStr := r.URL.Query().Get("taskid")
-	taskID, err := strconv.Atoi(taskIDStr)
-	api.infoLog.Println(taskID, err)
+	offsetStr := r.URL.Query().Get("offset")
+	var offsetVal int64
+	if len(offsetStr) != 0 {
+		offsetVal, err = strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid offset", http.StatusBadRequest)
+			return
+		}
+	} else {
+		offsetVal = 0
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	var limitVal int64
+	if len(offsetStr) != 0 {
+		limitVal, err = strconv.ParseInt(limitStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid offset", http.StatusBadRequest)
+			return
+		}
+	} else {
+		limitVal = 10
+	}
+
+	tasks, err := api.taskService.GetTaskListWithOffset(r.Context(), userID, limitVal, offsetVal)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			http.Error(w, "tasks not found", http.StatusNotFound)
+			return
+		}
+
+		api.errorLog.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set(headerContentType, jsonContentType)
+	json.NewEncoder(w).Encode(tasks)
+}
+
+func (api *Task) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	taskID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid taskID", http.StatusBadRequest)
 		return
 	}
 
-	var task storage.Task
-	err = json.NewDecoder(r.Body).Decode(&task)
+	task, err := models.TaskModelFromJson(r.Body)
 	if err != nil {
 		api.errorLog.Println("JSON error", err)
-		http.Error(w, "Bad json", http.StatusBadRequest)
+		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	task.ID = int64(taskID)
+	userID := r.Context().Value(auth.UIDInterface{}).(int64)
+	task.ID, task.UserID = int64(taskID), userID
 
-	uid := r.Context().Value(auth.UIDInterface{}).(int64)
-	if task.ActualTime != nil && *task.ActualTime != 0 {
-		api.infoLog.Println("GRPC CALL")
-		api.infoLog.Println(&task)
-		err := api.taskClient.RecalculateAndSaveTask(r.Context(), uid, &task)
-		if err != nil {
-			if errors.Is(err, predictions_client.ErrInvalidArgument) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			api.errorLog.Println("gRPC error:", err)
-			w.WriteHeader(http.StatusInternalServerError)
+	_, err = api.taskService.UpdateTaskAndMarkModel(r.Context(), task)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidTaskID) {
+			http.Error(w, "invalid taskID", http.StatusNotFound)
 			return
 		}
-	} else {
-		// перерасчет не требуется
-		err = api.storage.UpdateTask(r.Context(), int64(uid), int64(taskID), &task)
-		if err != nil {
-			if errors.Is(err, storage.ErrInvalidTaskID) {
-				http.Error(w, "Некорректный taskID", http.StatusBadRequest)
-				return
-			} else if errors.Is(err, storage.ErrTaskNotFound) {
-				http.Error(w, "Задача с таким taskID не найдена", http.StatusBadRequest)
-				return
-			}
-			api.errorLog.Println("Storage error:", err)
+		if errors.Is(err, service.ErrTaskNotFound) {
+			http.Error(w, "task not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, service.ErrNothingToUpdate) {
+			http.Error(w, "nothing to update (empty fields)", http.StatusBadRequest)
+			return
+		}
+		if !errors.Is(err, service.ErrModelNotFound) {
+			// thats ok error
+			api.errorLog.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -171,37 +204,19 @@ func (api *Task) UpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Task) DeleteTask(w http.ResponseWriter, r *http.Request) {
-	api.infoLog.Println("Delete Task")
-
-	taskIDStr := r.URL.Query().Get("taskid")
-	taskID, err := strconv.Atoi(taskIDStr)
+	taskID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		if errors.Is(err, storage.ErrInvalidTaskID) {
-			http.Error(w, "invalid taskID", http.StatusBadRequest)
-			return
-		}
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("bad taskID param"))
 		return
 	}
 
-	uid := r.Context().Value(auth.UIDInterface{}).(int64)
+	userID := r.Context().Value(auth.UIDInterface{}).(int64)
 
-	err = api.storage.DeleteTask(r.Context(), int64(uid), int64(taskID))
-	if err != nil {
-		if errors.Is(err, storage.ErrInvalidTaskID) {
-			http.Error(w, "invalid taskID", http.StatusBadRequest)
-		}
+	_, err = api.taskService.DeleteTaskAndMarkModel(r.Context(), userID, int64(taskID))
+	if err != nil && !errors.Is(err, service.ErrModelNotFound) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-
-	err = api.taskClient.Recalculate(r.Context(), uid)
-	if err != nil && !errors.Is(err, predictions_client.ErrFailedPrecondition) {
-		if errors.Is(err, predictions_client.ErrInvalidArgument) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-		api.errorLog.Println("gRPC error:", err)
-		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -210,7 +225,6 @@ func (api *Task) DeleteTask(w http.ResponseWriter, r *http.Request) {
 func (api *Task) Predict(w http.ResponseWriter, r *http.Request) {
 	api.infoLog.Println("Predict")
 
-	uid := r.Context().Value(auth.UIDInterface{}).(int64)
 	plannedTimeStr := r.URL.Query().Get("planned_time")
 	plannedTime, err := strconv.ParseFloat(plannedTimeStr, 64)
 	api.infoLog.Println(plannedTime, err)
@@ -219,16 +233,18 @@ func (api *Task) Predict(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actualTime, err := api.taskClient.Predict(r.Context(), uid, plannedTime)
+	userID := r.Context().Value(auth.UIDInterface{}).(int64)
+
+	actualTime, err := api.taskService.PredictTaskCompletionTime(r.Context(), userID, plannedTime)
 	if err != nil {
-		if errors.Is(err, predictions_client.ErrFailedPrecondition) {
+		if errors.Is(err, service.ErrNoCompletedTasks) {
 			http.Error(w, "Для того, чтобы сделать прогноз, хотя бы одна задача должна быть завершена", http.StatusBadRequest)
 			return
-		} else if errors.Is(err, predictions_client.ErrInvalidArgument) {
+		} else if errors.Is(err, service.ErrBadParams) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		api.errorLog.Println("gRPC error:", err)
+		api.errorLog.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

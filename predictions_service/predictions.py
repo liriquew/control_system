@@ -78,6 +78,7 @@ class Predicator():
         gb_model.fit(planned_time, actual_time)
 
         self.db.save_model(UID, gb_model)
+        return gb_model
 
     def fit_model(self, **kwargs):
         '''
@@ -141,8 +142,8 @@ class Predicator():
             model = self.db.load_model(UID)
         except ExceptionDB as e:
             if e.extra_info == ExceptionDB.NOT_FOUND:
-                raise PredicatorException("Model not found, probably the user does not have any completed tasks", grpc.StatusCode.FAILED_PRECONDITION)
-            raise e
+                model = self.recalulate_model(UID)
+
         planned_time = np.reshape(np.array([PlannedTime]), shape=(-1, 1))
         predict = float(model.predict(planned_time)[0])
 

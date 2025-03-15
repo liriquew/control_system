@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
-	"time_manage/internal/storage"
+	"time_manage/internal/models"
+	service "time_manage/internal/service/users"
 )
 
 const (
@@ -19,17 +21,22 @@ type AuthAPI interface {
 	AuthRequired(next http.Handler) http.Handler
 }
 
-type Auth struct {
-	infoLog  *log.Logger
-	errorLog *log.Logger
-	storage  *storage.Storage
+type userService interface {
+	AuthenticateUser(ctx context.Context, user *models.User) (*models.User, error)
+	RegisterUser(ctx context.Context, user *models.User) (*models.User, error)
 }
 
-func New(infoLog *log.Logger, errorLog *log.Logger, storage *storage.Storage) *Auth {
+type Auth struct {
+	userService userService
+	infoLog     *log.Logger
+	errorLog    *log.Logger
+}
+
+func New(infoLog *log.Logger, errorLog *log.Logger, userService userService) *Auth {
 	return &Auth{
-		infoLog:  infoLog,
-		errorLog: errorLog,
-		storage:  storage,
+		userService: userService,
+		infoLog:     infoLog,
+		errorLog:    errorLog,
 	}
 }
 
@@ -38,34 +45,29 @@ type tokenJWT struct {
 }
 
 func (api *Auth) SignIn(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement sighIn
-	api.infoLog.Println("Sing In")
-
-	var user storage.User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	api.infoLog.Println("User:", user)
-	if err != nil || user.Username == "" || user.Password == "" {
-		http.Error(w, "Ошибка чтения тела запроса", http.StatusBadRequest)
+	user, err := models.UserModelFromJson(r.Body)
+	if err != nil {
+		http.Error(w, "error while reading request body", http.StatusBadRequest)
 		return
 	}
 
-	userFromStorage, err := api.storage.GetUserByUsername(r.Context(), user.Username)
+	user, err = api.userService.AuthenticateUser(r.Context(), user)
 	if err != nil {
-		if errors.Is(err, storage.ErrUserNotFound) {
-			http.Error(w, "Пользователь не найден", http.StatusBadRequest)
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			http.Error(w, "bad request body", http.StatusBadRequest)
 			return
 		}
-		api.errorLog.Println("Storage error:", err)
+		if errors.Is(err, service.ErrUserNotFound) {
+			http.Error(w, "user not found", http.StatusBadRequest)
+			return
+		}
+
+		api.errorLog.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	if user.Password != userFromStorage.Password {
-		http.Error(w, "Неверный логин / пароль", http.StatusUnauthorized)
-		return
-	}
-
-	jwtToken, err := GenerateJWT(userFromStorage.ID)
+	jwtToken, err := GenerateJWT(user.ID)
 	if err != nil {
 		api.errorLog.Println("JWT error:", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -77,29 +79,29 @@ func (api *Auth) SignIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Auth) SignUp(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement signUp
-	api.infoLog.Println("sign Up")
-
-	var user storage.User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	api.infoLog.Println("User:", user)
-	if err != nil || user.Username == "" || user.Password == "" {
-		http.Error(w, "Ошибка чтения тела запроса", http.StatusBadRequest)
+	user, err := models.UserModelFromJson(r.Body)
+	if err != nil {
+		http.Error(w, "error while reading request body", http.StatusBadRequest)
 		return
 	}
 
-	uid, err := api.storage.CreateUser(r.Context(), user.Username, user.Password)
+	user, err = api.userService.RegisterUser(r.Context(), user)
 	if err != nil {
-		api.errorLog.Println("Storage error:", err.Error())
-		if errors.Is(storage.ErrUserAlreadyExists, err) {
-			http.Error(w, "Пользователь с таким именем уже существует", http.StatusBadRequest)
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			http.Error(w, "bad request body", http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, service.ErrAlreadyExists) {
+			http.Error(w, "user already exists", http.StatusConflict)
+			return
+		}
+
+		api.errorLog.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	jwtToken, err := GenerateJWT(uid)
+	jwtToken, err := GenerateJWT(user.ID)
 	if err != nil {
 		api.errorLog.Println("JWT error:", err.Error())
 		w.WriteHeader(http.StatusBadRequest)

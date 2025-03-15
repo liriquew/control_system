@@ -1,3 +1,4 @@
+import signal
 import grpc
 from concurrent import futures
 
@@ -15,12 +16,10 @@ class PredictService(pb2_grpc.PredictionsServicer):
 
     def RecalculateAndSaveTask(self, request: pb2.RecalculateAndSaveTaskRequest, context: grpc.aio.ServicerContext) -> pb2.RecalculateAndSaveTaskResponse:
         print('RecalculateAndSaveTask')
-        
-        updated_fields = MessageToDict(request)
-        
         print(request)
-
+        
         try:
+            updated_fields = MessageToDict(request)
             self.service.fit_model(**updated_fields)
         except PredicatorException as e:
             print(e, e.extra_info)
@@ -39,6 +38,7 @@ class PredictService(pb2_grpc.PredictionsServicer):
     def Predict(self, request: pb2.PredictRequest, context: grpc.aio.ServicerContext) -> pb2.PredictResponse:
         print('Predict')
         print(request)
+        
         predict : float
         try:
             predict = self.service.make_predict(request.UID, request.PlannedTime)
@@ -58,7 +58,6 @@ class PredictService(pb2_grpc.PredictionsServicer):
     
     def Recalculete(self, request, context):
         print('Recalculate')
-
         print(request)
 
         try:
@@ -80,18 +79,24 @@ class PredictService(pb2_grpc.PredictionsServicer):
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-
+    
     app_config = ConfigLoader()
-
     pb2_grpc.add_PredictionsServicer_to_server(PredictService(app_config), server)
-
-    conn_str = f"{app_config.get_service_config()["host"]}:{app_config.get_service_config()["port"]}"
-
+    
+    conn_str = f"{app_config.get_service_config()['host']}:{app_config.get_service_config()['port']}"
     server.add_insecure_port(conn_str)
+    
+    def handle_signal(sig, frame):
+        print("\nReceived shutdown signal, stopping server...")
+        server.stop(0)
+        exit(0)
+    
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    
     print(f"RUN on {conn_str}")
     server.start()
     server.wait_for_termination()
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     serve()

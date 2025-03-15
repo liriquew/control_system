@@ -3,11 +3,12 @@ import numpy as np
 import pickle
 
 class ExceptionDB(Exception):
+    NOT_FOUND = 0
+    
     def __init__(self, message, extra_info):
         super().__init__(message)
         self.extra_info = extra_info
 
-    NOT_FOUND = 0
 
 class Database():
     """
@@ -37,6 +38,7 @@ class Database():
                 raise ExceptionDB(f"model for UID={UID} not found", ExceptionDB.NOT_FOUND)
 
             # десериализация бинарных данных в объект модели
+            print(result)
             model = pickle.loads(result[0])
             return model
         except Exception as e:
