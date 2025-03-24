@@ -1,102 +1,75 @@
 import signal
 import grpc
 from concurrent import futures
+from typing import Dict, Any
 
 import predictions_service.predictions_service_pb2 as pb2
 import predictions_service.predictions_service_pb2_grpc as pb2_grpc
-from google.protobuf.json_format import MessageToDict, ParseDict
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.internal import containers as _containers
 
 from predictions import Predicator, PredicatorException
 from config import ConfigLoader
 
+
 class PredictService(pb2_grpc.PredictionsServicer):
-    def __init__(self, config: dict):
+    def __init__(self, config: Dict[str, Any]):
         self.service = Predicator(config)
-        pass
 
-    def RecalculateAndSaveTask(self, request: pb2.RecalculateAndSaveTaskRequest, context: grpc.aio.ServicerContext) -> pb2.RecalculateAndSaveTaskResponse:
-        print('RecalculateAndSaveTask')
-        print(request)
-        
-        try:
-            updated_fields = MessageToDict(request)
-            self.service.fit_model(**updated_fields)
-        except PredicatorException as e:
-            print(e, e.extra_info)
-            context.set_code(e.extra_info)
-            context.set_details(str(e))
-            return pb2.RecalculateAndSaveTaskResponse(Status=str(e))
-        except Exception as e:
-            print("INTERNAL:", e)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return pb2.RecalculateAndSaveTaskResponse(Status=str(e))
 
-        context.set_code(grpc.StatusCode.OK)
-        return pb2.RecalculateAndSaveTaskResponse(Status="ok")
+    def _handle_exception(self, context: grpc.ServicerContext, exception: Exception):
+        print(f"Error: {exception}, Details: {exception.extra_info if hasattr(exception, "extra_info") else ""}")
+        if isinstance(exception, PredicatorException):
+            context.abort(exception.extra_info, str(exception))
+        else:
+            context.abort(grpc.StatusCode.INTERNAL, str(exception))
 
-    def Predict(self, request: pb2.PredictRequest, context: grpc.aio.ServicerContext) -> pb2.PredictResponse:
-        print('Predict')
-        print(request)
-        
-        predict : float
+
+    def Predict(self, request: pb2.PredictRequest, context: grpc.ServicerContext) -> pb2.PredictResponse:
+        print("Predict")
         try:
             predict = self.service.make_predict(request.UID, request.PlannedTime)
-        except PredicatorException as e:
-            print(e, e.extra_info)
-            context.set_code(e.extra_info)
-            context.set_details(str(e))
-            return pb2.PredictResponse(Status=str(e))
         except Exception as e:
-            print("INTERNAL:", e)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return pb2.PredictResponse(Status=str(e))
+            self._handle_exception(context, e)
 
         context.set_code(grpc.StatusCode.OK)
         return pb2.PredictResponse(ActualTime=predict, Status="ok")
-    
-    def Recalculete(self, request, context):
-        print('Recalculate')
-        print(request)
 
+    
+    def PredictList(self, request: pb2.PredictListRequest, context: grpc.ServicerContext) -> pb2.PredictListResponse:
+        print("PredictList")
         try:
-            self.service.recalulate_model(request.UID)
-        except PredicatorException as e:
-            print(e, e.extra_info)
-            context.set_code(e.extra_info)
-            context.set_details(str(e))
-            return pb2.RecalculateResponse(Status=str(e))
+            print(MessageToDict(request))
+            predicts, unpredicted_uids = self.service.make_list_predict(request.PlannedUserTime)
         except Exception as e:
-            print("INTERNAL:", e)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return pb2.RecalculateResponse(Status=str(e))
+            self._handle_exception(context, e)
 
         context.set_code(grpc.StatusCode.OK)
-        return pb2.RecalculateResponse(Status="ok")
-
+        return pb2.PredictListResponse(PredictedUserTime=predicts, UnpredictedUIDs=unpredicted_uids)
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    
     app_config = ConfigLoader()
+    service_config = app_config.get_service_config()
+
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb2_grpc.add_PredictionsServicer_to_server(PredictService(app_config), server)
     
-    conn_str = f"{app_config.get_service_config()['host']}:{app_config.get_service_config()['port']}"
+    conn_str = f"{service_config["host"]}:{service_config["port"]}"
     server.add_insecure_port(conn_str)
-    
+
     def handle_signal(sig, frame):
         print("\nReceived shutdown signal, stopping server...")
         server.stop(0)
         exit(0)
-    
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
-    
-    print(f"RUN on {conn_str}")
+
+    print(f"Server running on {conn_str}")
     server.start()
     server.wait_for_termination()
 
+
 if __name__ == "__main__":
     serve()
+
+    

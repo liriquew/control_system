@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	predictions_client "time_manage/internal/grpc/client"
-	"time_manage/internal/models"
-	repository "time_manage/internal/repository/tasks"
+
+	predictions_client "github.com/liriquew/control_system/internal/grpc/client"
+	"github.com/liriquew/control_system/internal/models"
+	repository "github.com/liriquew/control_system/internal/repository/tasks"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -23,18 +24,18 @@ type taskRepository interface {
 }
 
 type TaskService struct {
-	taskRepo   taskRepository
-	taskClient *predictions_client.Client
-	infoLog    *log.Logger
-	errorLog   *log.Logger
+	taskRepo        taskRepository
+	predictorClient *predictions_client.Client
+	infoLog         *log.Logger
+	errorLog        *log.Logger
 }
 
-func NewTaskService(taskRepo taskRepository, taskClient *predictions_client.Client, infolog *log.Logger, errorLog *log.Logger) (*TaskService, error) {
+func NewTaskService(taskRepo taskRepository, predictionsClient *predictions_client.Client, infolog *log.Logger, errorLog *log.Logger) (*TaskService, error) {
 	return &TaskService{
-		taskRepo:   taskRepo,
-		taskClient: taskClient,
-		infoLog:    infolog,
-		errorLog:   errorLog,
+		taskRepo:        taskRepo,
+		predictorClient: predictionsClient,
+		infoLog:         infolog,
+		errorLog:        errorLog,
 	}, nil
 }
 
@@ -189,7 +190,7 @@ func (ts *TaskService) DeleteTaskAndMarkModel(ctx context.Context, userID, taskI
 }
 
 func (ts *TaskService) PredictTaskCompletionTime(ctx context.Context, userID int64, plannedTime float64) (float64, error) {
-	actualTime, err := ts.taskClient.Predict(ctx, userID, plannedTime)
+	actualTime, err := ts.predictorClient.Predict(ctx, userID, plannedTime)
 	if err != nil {
 		if errors.Is(err, predictions_client.ErrFailedPrecondition) {
 			return 0, ErrNoCompletedTasks

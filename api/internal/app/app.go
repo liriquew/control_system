@@ -2,24 +2,26 @@ package app
 
 import (
 	"log"
-	"time_manage/internal/api_handlers/auth"
-	"time_manage/internal/api_handlers/graphs"
-	group_handlers "time_manage/internal/api_handlers/groups"
-	"time_manage/internal/api_handlers/task"
-	appapi "time_manage/internal/app/api"
-	"time_manage/internal/config"
-	predictions_client "time_manage/internal/grpc/client"
 
-	graphs_repository "time_manage/internal/repository/graphs"
-	group_repository "time_manage/internal/repository/groups"
-	tasks_repository "time_manage/internal/repository/tasks"
-	users_repository "time_manage/internal/repository/users"
-	"time_manage/internal/storage"
+	"github.com/liriquew/control_system/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/internal/api_handlers/graphs"
+	group_handlers "github.com/liriquew/control_system/internal/api_handlers/groups"
+	"github.com/liriquew/control_system/internal/api_handlers/task"
+	appapi "github.com/liriquew/control_system/internal/app/api"
+	"github.com/liriquew/control_system/internal/config"
+	predictions_client "github.com/liriquew/control_system/internal/grpc/client"
 
-	graphs_service "time_manage/internal/service/graphs"
-	groups_service "time_manage/internal/service/groups"
-	tasks_service "time_manage/internal/service/tasks"
-	users_service "time_manage/internal/service/users"
+	graphstasks_repository "github.com/liriquew/control_system/internal/repository/graph_tasks"
+	graphs_repository "github.com/liriquew/control_system/internal/repository/graphs"
+	group_repository "github.com/liriquew/control_system/internal/repository/groups"
+	tasks_repository "github.com/liriquew/control_system/internal/repository/tasks"
+	users_repository "github.com/liriquew/control_system/internal/repository/users"
+	"github.com/liriquew/control_system/internal/storage"
+
+	graphs_service "github.com/liriquew/control_system/internal/service/graphs"
+	groups_service "github.com/liriquew/control_system/internal/service/groups"
+	tasks_service "github.com/liriquew/control_system/internal/service/tasks"
+	users_service "github.com/liriquew/control_system/internal/service/users"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -50,8 +52,12 @@ func New(infoLog, errorLog *log.Logger, cfg config.AppConfig) *App {
 	if err != nil {
 		panic(err)
 	}
+	graphsTasksRepository, err := graphstasks_repository.NewGraphsTasksRepository(db)
+	if err != nil {
+		panic(err)
+	}
 
-	taskClient, err := predictions_client.New(infoLog, &cfg.PredictionsService)
+	predictorClient, err := predictions_client.New(infoLog, &cfg.PredictionsService)
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +66,7 @@ func New(infoLog, errorLog *log.Logger, cfg config.AppConfig) *App {
 	if err != nil {
 		panic(err)
 	}
-	taskService, err := tasks_service.NewTaskService(taskRepository, taskClient, infoLog, errorLog)
+	taskService, err := tasks_service.NewTaskService(taskRepository, predictorClient, infoLog, errorLog)
 	if err != nil {
 		panic(err)
 	}
@@ -68,7 +74,7 @@ func New(infoLog, errorLog *log.Logger, cfg config.AppConfig) *App {
 	if err != nil {
 		panic(err)
 	}
-	graphService, err := graphs_service.NewGraphsService(graphReository, infoLog, errorLog)
+	graphService, err := graphs_service.NewGraphsService(graphReository, predictorClient, graphsTasksRepository, infoLog, errorLog)
 	if err != nil {
 		panic(err)
 	}

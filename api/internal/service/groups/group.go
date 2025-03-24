@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time_manage/internal/entities"
-	"time_manage/internal/models"
-	repository "time_manage/internal/repository/groups"
-	service "time_manage/internal/service/graphs"
+
+	"github.com/liriquew/control_system/internal/entities"
+	graphtools "github.com/liriquew/control_system/internal/lib/graph_tools"
+	"github.com/liriquew/control_system/internal/models"
+	repository "github.com/liriquew/control_system/internal/repository/groups"
+	service "github.com/liriquew/control_system/internal/service/graphs"
 )
 
 type GroupsRepository interface {
@@ -57,6 +59,8 @@ var (
 	ErrMemberNotFound = errors.New("group not found")
 	ErrNoNodes        = errors.New("empty nodes list")
 	ErrInvalideRole   = errors.New("invalide role")
+
+	ErrCycleInGraph = errors.New("graph with cycle")
 )
 
 func (gs *GroupService) CreateGroup(ctx context.Context, group *models.Group) (*models.Group, error) {
@@ -240,13 +244,6 @@ func (gs *GroupService) ChangeMemberRole(ctx context.Context, ownerID int64, mem
 }
 
 func (gs *GroupService) CreateGroupGraph(ctx context.Context, graph *entities.GraphWithNodes) (*models.Graph, error) {
-	if err := gs.groupRepo.CheckAdminPermission(ctx, graph.GraphInfo.CreatedBy, graph.GraphInfo.GroupID); err != nil {
-		if errors.Is(err, repository.ErrDenied) {
-			return nil, ErrDenied
-		}
-		return nil, err
-	}
-
 	if len(graph.Nodes) == 0 {
 		return nil, ErrNoNodes
 	}
@@ -261,6 +258,9 @@ func (gs *GroupService) CreateGroupGraph(ctx context.Context, graph *entities.Gr
 	}
 
 	// check cycles in graph by topo sort algo (write this btw)
+	if graphtools.HasCycle(graph) {
+		return nil, ErrCycleInGraph
+	}
 
 	graphModel, err := gs.groupRepo.CreateGroupGraph(ctx, &graph.GraphInfo, graph.Nodes)
 	if err != nil {

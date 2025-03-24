@@ -9,7 +9,6 @@ class ExceptionDB(Exception):
         super().__init__(message)
         self.extra_info = extra_info
 
-
 class Database():
     """
     Класс для работы с базой данных PostgreSQL
@@ -24,21 +23,24 @@ class Database():
             password=config["password"],
             host=config["host"]
         )
+ 
 
     def load_model(self, UID: int):
-        '''
+        """
         Загружает созданную ранее модель пользователя
-        '''
+        """
+        print("database.Database.load_model()")
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT model FROM models WHERE user_id = %s", (UID,))
+            cursor.execute("SELECT model, is_active FROM models WHERE user_id = %s", (UID,))
             result = cursor.fetchone()
             
             if result is None:
                 raise ExceptionDB(f"model for UID={UID} not found", ExceptionDB.NOT_FOUND)
 
-            # десериализация бинарных данных в объект модели
-            print(result)
+            if not result[1]:
+                return None
+
             model = pickle.loads(result[0])
             return model
         except Exception as e:
@@ -47,10 +49,12 @@ class Database():
         finally:
             cursor.close()
 
+
     def save_model(self, UID: int, model):
         """
         Сохраняет модель и задачу пользователя в базу данных
         """
+        print("database.Database.save_model()")
         try:
             model_binary = pickle.dumps(model)
 
@@ -58,11 +62,11 @@ class Database():
             
             # save model
             cursor.execute("""
-                INSERT INTO models (user_id, model) 
-                VALUES (%s, %s) 
+                INSERT INTO models (user_id, model, is_active) 
+                VALUES (%s, %s, %s) 
                 ON CONFLICT (user_id) DO UPDATE 
-                SET model = EXCLUDED.model RETURNING id""",
-                (UID, psycopg2.Binary(model_binary))
+                SET model = EXCLUDED.model, is_active=true RETURNING id""",
+                (UID, psycopg2.Binary(model_binary), True)
             )
             model_id = cursor.fetchone()[0]
 
@@ -71,16 +75,18 @@ class Database():
             return model_id
         except Exception as e:
             self.conn.rollback()
-            print(f"database.Database.save_model(): Error when saving model: {e}")
+            print(f"database.Database.save_model(): Error while saving model: {e}")
             raise e
         finally:
             cursor.close()
+
 
     def delete_model(self, UID: int):
         """
         Удаляет запись с моделью пользователя 
         (необходимо в случае, если задач нет, т.е. все удалены, и дальнейшие прогнозы не нужны)
         """
+        print("database.Database.delete_model()")
         try:
             cursor = self.conn.cursor()
             cursor.execute("""
@@ -97,81 +103,13 @@ class Database():
         finally:
             cursor.close()
         
-
-    def save_model_and_task(self, UID: int, task_id: int, new_actual_time: float, model, **kwargs):
-        """
-        Сохраняет модель и задачу пользователя в базу данных
-        """
-        try:
-            model_binary = pickle.dumps(model)
-
-            cursor = self.conn.cursor()
-            
-            # save model
-            cursor.execute("""
-                INSERT INTO models (user_id, model) 
-                VALUES (%s, %s) 
-                ON CONFLICT (user_id) DO UPDATE 
-                SET model = EXCLUDED.model RETURNING id""",
-                (UID, psycopg2.Binary(model_binary))
-            )
-            model_id = cursor.fetchone()[0]
-
-            # save task
-            map_names = {
-                'Title': 'title',
-                'Description': 'description',
-                'PlannedTime': 'planned_time',
-            }
-            cursor = self.conn.cursor()
-
-            set_parts = [(f"{map_names[k]} = %s", v) for k, v in kwargs.items()]
-            set_clause = ", ".join([sp[0] for sp in set_parts] + ['actual_time = %s'])
-
-            query = f"UPDATE tasks SET {set_clause} WHERE id = %s AND user_id = %s"
-            values = [sp[1] for sp in set_parts] + [new_actual_time, task_id, UID]
-            cursor.execute(query, values)
-
-            self.conn.commit()
-            print(f"model saved id: {model_id}")
-            return model_id
-        except Exception as e:
-            self.conn.rollback()
-            print(f"database.Database.save_model_and_task(): Error when saving model and users`s task: {e}")
-            raise e
-        finally:
-            cursor.close()
-    
-    def get_task(self, UID: int, task_id: int) -> tuple[int, float, float]:
-        '''
-        Возвращает задачу пользователя по id из базы данных
-        '''
-        try:
-
-            cursor = self.conn.cursor()
-            cursor.execute(
-                "SELECT id, planned_time, actual_time FROM tasks WHERE id=%s AND user_id=%s",
-                (task_id, UID)
-            )
-            result = cursor.fetchone()
-            cursor.close()
-            
-            if not result:
-                print(f"Task with task_id: {task_id} not found")
-                return None
-
-            return result
-        except Exception as e:
-            self.conn.rollback()
-            print(f"database.Database.get_task(): Error collecting task from db: {e}")
-        finally:
-            cursor.close()
-
+        
     def get_user_tasks(self, UID:int) -> list[tuple[int, float, float]]:
-        '''
+        """
         Выбирает все задачи пользователя, 
         которые имеют известное действительное время выполнения
-        '''
+        """
+        print("database.Database.get_user_tasks()")
         try:
             cursor = self.conn.cursor()
             cursor.execute(

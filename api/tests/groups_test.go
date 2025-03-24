@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
-	"time_manage/internal/entities"
-	"time_manage/internal/models"
-	"time_manage/tests/suite"
+
+	"github.com/liriquew/control_system/internal/entities"
+	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/tests/suite"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/stretchr/testify/assert"

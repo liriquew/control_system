@@ -7,11 +7,11 @@ import (
 	"log"
 	"net/http"
 
-	"time_manage/internal/api_handlers/auth"
-	"time_manage/internal/entities"
-	jsontools "time_manage/internal/lib/json_tools"
-	"time_manage/internal/models"
-	service "time_manage/internal/service/groups"
+	"github.com/liriquew/control_system/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/internal/entities"
+	jsontools "github.com/liriquew/control_system/internal/lib/json_tools"
+	"github.com/liriquew/control_system/internal/models"
+	service "github.com/liriquew/control_system/internal/service/groups"
 )
 
 type GroupsAPI interface {
@@ -341,6 +341,10 @@ func (g *Group) CreateGroupGraph(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, service.ErrDenied) {
 			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, service.ErrCycleInGraph) {
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 

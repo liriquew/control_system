@@ -5,9 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time_manage/internal/entities"
-	"time_manage/internal/models"
-	repository "time_manage/internal/repository/graphs"
+
+	"github.com/liriquew/control_system/internal/entities"
+	predictions_client "github.com/liriquew/control_system/internal/grpc/client"
+	graphtools "github.com/liriquew/control_system/internal/lib/graph_tools"
+	"github.com/liriquew/control_system/internal/models"
+	graphs_tasks_repository "github.com/liriquew/control_system/internal/repository/graph_tasks"
+	repository "github.com/liriquew/control_system/internal/repository/graphs"
 )
 
 type GraphsRepository interface {
@@ -24,30 +28,42 @@ type GraphsRepository interface {
 	RemoveDependensy(ctx context.Context, userID, graphID int64, dependency *models.Dependency) error
 }
 
-type GraphsService struct {
-	graphsRepo GraphsRepository
-	infoLog    *log.Logger
-	errorLog   *log.Logger
+type GraphsTasksRepository interface {
+	GetTasksFromNodes(ctx context.Context, nodes []*models.Node) ([]*models.Task, error)
 }
 
-func NewGraphsService(repo GraphsRepository, infoLog, errorLog *log.Logger) (*GraphsService, error) {
+type GraphsService struct {
+	graphsRepo      GraphsRepository
+	graphsTasksRepo GraphsTasksRepository
+	predictorClient *predictions_client.Client
+	infoLog         *log.Logger
+	errorLog        *log.Logger
+}
+
+func NewGraphsService(repo GraphsRepository, predictionsClient *predictions_client.Client, graph_tasks_repo GraphsTasksRepository, infoLog, errorLog *log.Logger) (*GraphsService, error) {
 	return &GraphsService{
-		graphsRepo: repo,
-		infoLog:    infoLog,
-		errorLog:   errorLog,
+		graphsRepo:      repo,
+		graphsTasksRepo: graph_tasks_repo,
+		predictorClient: predictionsClient,
+		infoLog:         infoLog,
+		errorLog:        errorLog,
 	}, nil
 }
 
 var (
 	ErrDenied = fmt.Errorf("access denyed")
 
-	ErrNotFound               = errors.New("not found")
-	ErrNotExists              = errors.New("")
+	ErrNotFound  = errors.New("not found")
+	ErrNotExists = errors.New("")
+
 	ErrNodeNotFound           = errors.New("node not found")
 	ErrDepNotFound            = errors.New("dependency not found")
 	ErrNothingToUpdate        = errors.New("empty updatable fields")
 	ErrBadIDParams            = errors.New("bad ID params")
 	ErrSelfDependencyRejected = errors.New("")
+
+	ErrCycleInGraph      = errors.New("cycle found")
+	ErrSomeTasksNotFound = errors.New("some tasks not found")
 )
 
 func (gs *GraphsService) checkEditorPermission(ctx context.Context, userID, graphID int64) error {
@@ -235,4 +251,75 @@ func (gs *GraphsService) RemoveDependensy(ctx context.Context, userID, graphID i
 	}
 
 	return nil
+}
+
+func (gs *GraphsService) PredictGraph(ctx context.Context, userID, graphID int64) (*entities.PredictedGraph, error) {
+	if err := gs.checkUserPermission(ctx, userID, graphID); err != nil {
+		return nil, err
+	}
+
+	graphWithNodes, err := gs.graphsRepo.GetGraph(ctx, graphID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		gs.errorLog.Println(err)
+		return nil, err
+	}
+
+	nodesTasks, err := gs.graphsTasksRepo.GetTasksFromNodes(ctx, graphWithNodes.Nodes)
+	if err != nil {
+		if errors.Is(err, graphs_tasks_repository.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		gs.errorLog.Println(err)
+		return nil, err
+	}
+
+	if len(nodesTasks) != len(graphWithNodes.Nodes) {
+		return nil, ErrSomeTasksNotFound
+	}
+
+	tasksNodesMap := make(map[int64]*models.Node, len(nodesTasks))
+	for _, node := range graphWithNodes.Nodes {
+		tasksNodesMap[node.TaskID] = node
+	}
+
+	nodesWithTasks := make([]*entities.NodeWithTask, 0, len(nodesTasks))
+	for _, task := range nodesTasks {
+		nodesWithTasks = append(nodesWithTasks, &entities.NodeWithTask{
+			Node: tasksNodesMap[task.ID],
+			Task: task,
+		})
+	}
+
+	predictedNodes, err := gs.predictorClient.PredictList(ctx, nodesWithTasks)
+	if err != nil {
+		return nil, err
+	}
+
+	predictableGraph := &entities.GraphWithTasks{
+		GraphInfo:       graphWithNodes.GraphInfo,
+		Nodes:           predictedNodes.Nodes,
+		UnpredictedUIDs: predictedNodes.UnpredictedUIDs,
+	}
+
+	nodesValuesMap := make(map[int64]float64, len(predictableGraph.Nodes))
+	for _, node := range predictableGraph.Nodes {
+		nodesValuesMap[node.Node.ID] = node.PredictedTime
+	}
+
+	paths, err := graphtools.FindCriticalPath(predictableGraph, nodesValuesMap)
+	if err != nil {
+		if errors.Is(err, graphtools.ErrCycleInGraph) {
+			return nil, ErrCycleInGraph
+		}
+		return nil, err
+	}
+
+	// predictable graph contains some additional edges!
+	return &entities.PredictedGraph{
+		Graph: predictableGraph,
+		Paths: paths,
+	}, nil
 }

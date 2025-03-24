@@ -2,7 +2,8 @@ package storage
 
 import (
 	"fmt"
-	"time_manage/internal/config"
+
+	"github.com/liriquew/control_system/internal/config"
 
 	"github.com/jmoiron/sqlx"
 )

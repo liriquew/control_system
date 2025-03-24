@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time_manage/internal/models"
+
+	"github.com/liriquew/control_system/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"

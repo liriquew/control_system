@@ -2,10 +2,11 @@ package appapi
 
 import (
 	"net/http"
-	"time_manage/internal/api_handlers/auth"
-	"time_manage/internal/api_handlers/graphs"
-	"time_manage/internal/api_handlers/groups"
-	"time_manage/internal/api_handlers/task"
+
+	"github.com/liriquew/control_system/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/internal/api_handlers/graphs"
+	"github.com/liriquew/control_system/internal/api_handlers/groups"
+	"github.com/liriquew/control_system/internal/api_handlers/task"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
@@ -55,6 +56,8 @@ func New(authAPI auth.AuthAPI, taskAPI task.TaskAPI, groupsAPI groups.GroupsAPI,
 
 		r.With(authAPI.AuthRequired, graphs.GraphIDGetter).Route("/graphs/{graphID}", func(r chi.Router) {
 			r.Get("/", http.HandlerFunc(graphsAPI.GetGraph))
+			r.Get("/predict", http.HandlerFunc(graphsAPI.PredictGraph))
+
 			r.Route("/nodes", func(r chi.Router) {
 				r.Post("/", http.HandlerFunc(graphsAPI.CreateNode))
 

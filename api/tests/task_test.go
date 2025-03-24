@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time_manage/internal/models"
-	"time_manage/tests/suite"
+
+	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/tests/suite"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/golang-jwt/jwt"

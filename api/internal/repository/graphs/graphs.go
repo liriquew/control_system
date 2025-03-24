@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time_manage/internal/entities"
-	"time_manage/internal/models"
+
+	"github.com/liriquew/control_system/internal/entities"
+	"github.com/liriquew/control_system/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -92,7 +93,7 @@ func (gr *GraphsRepository) GetGraph(ctx context.Context, graphID int64) (*entit
 		// Если узлов нет, оставляем nodes пустым
 	}
 
-	query = "SELECT from_node_id FROM dependencies WHERE graph_id=$1 AND to_node_id=$2"
+	query = "SELECT to_node_id FROM dependencies WHERE graph_id=$1 AND from_node_id=$2"
 
 	for _, node := range nodes {
 		if err := gr.db.SelectContext(ctx, &node.DependencyNodeIDs, query, graphID, node.ID); err != nil {
@@ -165,7 +166,7 @@ func (gr *GraphsRepository) CreateNode(ctx context.Context, userID, graphID int6
 		}
 		nodeIDs[depNodeID] = struct{}{}
 
-		if _, err := txn.ExecContext(ctx, query, graphID, depNodeID, node.ID); err != nil {
+		if _, err := txn.ExecContext(ctx, query, graphID, node.ID, depNodeID); err != nil {
 			if pqErr, ok := err.(*pq.Error); ok {
 				switch pqErr.Code {
 				case "23503": // Код ошибки для FOREIGN KEY violation
@@ -208,7 +209,7 @@ func (gr *GraphsRepository) GetNode(ctx context.Context, graphID, nodeID int64) 
 	}
 
 	query = `
-		SELECT from_node_id FROM dependencies WHERE graph_id=$1 AND to_node_id=$2
+		SELECT to_node_id FROM dependencies WHERE graph_id=$1 AND from_node_id=$2
 	`
 
 	if err := gr.db.SelectContext(ctx, &node.DependencyNodeIDs, query, graphID, nodeID); err != nil {
@@ -291,7 +292,7 @@ func (gr *GraphsRepository) GetDependencies(ctx context.Context, userID, graphID
 		return nil, err
 	}
 
-	query = "SELECT from_node_id FROM dependencies WHERE graph_id=$1 AND to_node_id=$2"
+	query = "SELECT to_node_id FROM dependencies WHERE graph_id=$1 AND from_node_id=$2"
 
 	if err := gr.db.SelectContext(ctx, &nodeWithDeps.DependencyNodeIDs, query, graphID, nodeID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -305,7 +306,7 @@ func (gr *GraphsRepository) GetDependencies(ctx context.Context, userID, graphID
 
 func (gr *GraphsRepository) AddDependency(ctx context.Context, userID, graphID int64, dependency *models.Dependency) (*models.Dependency, error) {
 	query := "INSERT INTO dependencies (from_node_id, to_node_id, graph_id) VALUES ($1, $2, $3)"
-
+	fmt.Println(dependency.FromNodeID, dependency.ToNodeID, graphID)
 	if _, err := gr.db.ExecContext(ctx, query, dependency.FromNodeID, dependency.ToNodeID, graphID); err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code {

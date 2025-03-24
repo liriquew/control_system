@@ -6,8 +6,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"time_manage/internal/models"
-	service "time_manage/internal/service/users"
+
+	"github.com/liriquew/control_system/internal/models"
+	service "github.com/liriquew/control_system/internal/service/users"
 )
 
 const (

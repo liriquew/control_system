@@ -9,8 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"time_manage/internal/app"
-	"time_manage/internal/config"
+
+	"github.com/liriquew/control_system/internal/app"
+	"github.com/liriquew/control_system/internal/config"
 )
 
 type API struct {

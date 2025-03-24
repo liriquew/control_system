@@ -3,7 +3,8 @@ package suite
 import (
 	"fmt"
 	"testing"
-	"time_manage/internal/config"
+
+	"github.com/liriquew/control_system/internal/config"
 )
 
 type Suite struct {

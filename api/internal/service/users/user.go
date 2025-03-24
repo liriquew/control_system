@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time_manage/internal/models"
-	repository "time_manage/internal/repository/users"
+
+	"github.com/liriquew/control_system/internal/models"
+	repository "github.com/liriquew/control_system/internal/repository/users"
 )
 
 type UserRepository interface {

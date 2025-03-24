@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time_manage/internal/entities"
-	"time_manage/internal/models"
+
+	"github.com/liriquew/control_system/internal/entities"
+	"github.com/liriquew/control_system/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -404,21 +405,27 @@ func (gr *GroupsRepository) CreateGroupGraph(ctx context.Context, graph *models.
 			return nil, fmt.Errorf("error while creating node: %w", err)
 		}
 		nodeIDMap[node.ID] = nodeID
+		fmt.Println(node, node.DependencyNodeIDs)
 		node.ID = nodeID
 	}
 
 	// Зависимости
-	// TODO: use prepare statement
 	dependencyQuery := `INSERT INTO dependencies (from_node_id, to_node_id, graph_id) VALUES ($1, $2, $3)`
+	stmt, err := txn.PrepareContext(ctx, dependencyQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
 	for _, node := range nodes {
-		toNodeID := node.ID
+		fromNodeID := node.ID
 		for _, dependencyNodeDummyID := range node.DependencyNodeIDs {
-			fromNodeID := nodeIDMap[dependencyNodeDummyID]
-			_, err = txn.ExecContext(ctx, dependencyQuery, fromNodeID, toNodeID, graph.ID)
+			toNodeID := nodeIDMap[dependencyNodeDummyID]
+			fmt.Println(fromNodeID, toNodeID, graph.ID, dependencyNodeDummyID, nodeIDMap)
+			_, err = stmt.ExecContext(ctx, fromNodeID, toNodeID, graph.ID)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating dependency: %w", err)
 			}
-			node.DependencyNodeIDs = append(node.DependencyNodeIDs, fromNodeID)
+			node.DependencyNodeIDs = append(node.DependencyNodeIDs, toNodeID)
 		}
 	}
 
@@ -454,8 +461,7 @@ func (gr *GroupsRepository) ListGroupGraphs(ctx context.Context, userID int64, g
 	}
 
 	queryNodes := "SELECT * FROM nodes WHERE graph_id=$1"
-	queryDependencies := "SELECT from_node_id FROM dependencies WHERE to_node_id=$1"
-	// TODO: use prepared statement
+	queryDependencies := "SELECT to_node_id FROM dependencies WHERE from_node_id=$1"
 	for i, graph := range graphs {
 		if err := gr.db.SelectContext(ctx, &graphsWithNodes[i].Nodes, queryNodes, graph.ID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {

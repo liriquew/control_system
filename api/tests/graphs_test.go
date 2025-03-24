@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
-	"time_manage/internal/entities"
-	"time_manage/internal/models"
-	"time_manage/tests/suite"
+
+	"github.com/liriquew/control_system/internal/entities"
+	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/tests/suite"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/golang-jwt/jwt"
@@ -20,79 +21,77 @@ func createGraph(t *testing.T, ts *suite.Suite, token string, graph entities.Gra
 	body, err := json.Marshal(graph)
 	require.NoError(t, err)
 
-	// Создаем HTTP-запрос
 	req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(graph.GraphInfo.GroupID, 10)+"/graphs", bytes.NewBuffer(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	// Отправляем запрос
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Проверяем статус ответа
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Читаем тело ответа
 	var createdGraph models.Graph
 	err = json.NewDecoder(resp.Body).Decode(&createdGraph)
 	require.NoError(t, err)
 
-	// Возвращаем ID созданного графа
 	return createdGraph.ID
 }
 
 func getGraph(t *testing.T, ts *suite.Suite, token string, graphID int64) entities.GraphWithNodes {
-	// Создаем HTTP-запрос
 	req, err := http.NewRequest("POST", ts.GetURL()+"/api/grahs/"+strconv.FormatInt(graphID, 10), bytes.NewBuffer([]byte{}))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	// Отправляем запрос
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Проверяем статус ответа
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Читаем тело ответа
 	var createdGraph entities.GraphWithNodes
 	err = json.NewDecoder(resp.Body).Decode(&createdGraph)
 	require.NoError(t, err)
 
-	// Возвращаем ID созданного графа
 	return createdGraph
 }
 
 func createNode(t *testing.T, ts *suite.Suite, token string, graphID int64, node models.Node) int64 {
-	// Преобразуем узел в JSON
 	body, err := json.Marshal(node)
 	require.NoError(t, err)
 
-	// Создаем HTTP-запрос
 	req, err := http.NewRequest("POST", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes", bytes.NewBuffer(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	// Отправляем запрос
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Проверяем статус ответа
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Читаем тело ответа
 	var createdNode models.Node
 	err = json.NewDecoder(resp.Body).Decode(&createdNode)
 	require.NoError(t, err)
 
-	// Возвращаем ID созданного узла
 	return createdNode.ID
+}
+
+func createDependency(t *testing.T, ts *suite.Suite, token string, graphID, node1ID, node2ID int64) {
+	req, err := http.NewRequest("POST", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node1ID, 10)+"/dependencies/"+strconv.FormatInt(node2ID, 10), nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
 }
 
 func TestGetGraph(t *testing.T) {
@@ -787,7 +786,7 @@ func TestAddDependency(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Проверяем, что зависимость добавлена
-	req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node2ID, 10)+"/dependencies", nil)
+	req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node1ID, 10)+"/dependencies", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err = http.DefaultClient.Do(req)
@@ -799,7 +798,7 @@ func TestAddDependency(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, dependencies.DependencyNodeIDs, 1)
-	assert.Equal(t, node1ID, dependencies.DependencyNodeIDs[0])
+	assert.Equal(t, node2ID, dependencies.DependencyNodeIDs[0])
 }
 
 func TestRemoveDependency(t *testing.T) {
@@ -874,7 +873,7 @@ func TestRemoveDependency(t *testing.T) {
 	node2ID := createNode(t, ts, token, graphID, node2)
 
 	// Удаляем зависимость
-	req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node1ID, 10)+"/dependencies/"+strconv.FormatInt(node2ID, 10), nil)
+	req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node2ID, 10)+"/dependencies/"+strconv.FormatInt(node1ID, 10), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -896,4 +895,159 @@ func TestRemoveDependency(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, dependencies.DependencyNodeIDs, 0)
+}
+
+func TestPredictGraph(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	_, token := doSignUpFakeUser(t, ts, user)
+
+	user1 := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user1, _ = doSignUpFakeUser(t, ts, user1)
+
+	user2 := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user2, _ = doSignUpFakeUser(t, ts, user2)
+
+	group := models.Group{
+		Name:        gofakeit.Company(),
+		Description: gofakeit.Sentence(10),
+	}
+	groupID := createGroup(t, ts, token, group)
+
+	task1 := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: gofakeit.Float64(),
+		UserID:      user1.ID,
+	}
+	task1ID := createTask(t, ts, token, task1)
+
+	task2 := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: gofakeit.Float64(),
+		UserID:      user2.ID,
+	}
+	task2ID := createTask(t, ts, token, task2)
+
+	graph := entities.GraphWithNodes{
+		GraphInfo: models.Graph{
+			Name:    gofakeit.BeerName(),
+			GroupID: groupID,
+		},
+		Nodes: []*models.Node{
+			{
+				ID:                1,
+				TaskID:            task1ID,
+				DependencyNodeIDs: []int64{},
+				AssignedTo:        &user1.ID,
+			},
+			{
+				ID:                2,
+				TaskID:            task2ID,
+				DependencyNodeIDs: []int64{1},
+				AssignedTo:        &user2.ID,
+			},
+		},
+	}
+	graphID := createGraph(t, ts, token, graph)
+
+	// Тестируем успешный сценарий
+	t.Run("Success", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/predict", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var predictedGraph entities.PredictedGraph
+		err = json.NewDecoder(resp.Body).Decode(&predictedGraph)
+		require.NoError(t, err)
+
+		assert.NotNil(t, predictedGraph.Graph)
+		assert.NotEmpty(t, predictedGraph.Paths)
+	})
+
+	// Тестируем ошибку доступа
+	t.Run("Access denied", func(t *testing.T) {
+		// Создаем другого пользователя
+		otherUser := models.User{
+			Username: gofakeit.Username(),
+			Password: getSomePassword(),
+		}
+		_, otherToken := doSignUpFakeUser(t, ts, otherUser)
+
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/predict", nil)
+		req.Header.Set("Authorization", "Bearer "+otherToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	// Тестируем ошибку "граф не найден"
+	t.Run("Graph not found", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/999999/predict", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	// Тестируем ошибку "цикл в графе"
+	t.Run("Cycle in graph", func(t *testing.T) {
+		// Создаем граф с циклом
+		cyclicGraph := entities.GraphWithNodes{
+			GraphInfo: models.Graph{
+				Name:    gofakeit.BeerName(),
+				GroupID: groupID,
+			},
+			Nodes: []*models.Node{
+				{
+					ID:                1,
+					TaskID:            task1ID,
+					DependencyNodeIDs: []int64{2},
+					AssignedTo:        &user1.ID,
+				},
+				{
+					ID:                2,
+					TaskID:            task2ID,
+					DependencyNodeIDs: []int64{1},
+					AssignedTo:        &user1.ID,
+				},
+			},
+		}
+		body, err := json.Marshal(cyclicGraph)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(graph.GraphInfo.GroupID, 10)+"/graphs", bytes.NewBuffer(body))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	})
 }

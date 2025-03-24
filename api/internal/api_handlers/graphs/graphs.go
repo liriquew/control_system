@@ -6,11 +6,12 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"time_manage/internal/api_handlers/auth"
-	"time_manage/internal/entities"
-	jsontools "time_manage/internal/lib/json_tools"
-	"time_manage/internal/models"
-	service "time_manage/internal/service/graphs"
+
+	"github.com/liriquew/control_system/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/internal/entities"
+	jsontools "github.com/liriquew/control_system/internal/lib/json_tools"
+	"github.com/liriquew/control_system/internal/models"
+	service "github.com/liriquew/control_system/internal/service/graphs"
 )
 
 type GpraphsAPI interface {
@@ -22,6 +23,7 @@ type GpraphsAPI interface {
 	GetDependencies(w http.ResponseWriter, r *http.Request)
 	AddDependency(w http.ResponseWriter, r *http.Request)
 	RemoveDependensy(w http.ResponseWriter, r *http.Request)
+	PredictGraph(w http.ResponseWriter, r *http.Request)
 }
 
 type GraphsServiceInterface interface {
@@ -33,6 +35,7 @@ type GraphsServiceInterface interface {
 	GetDependencies(ctx context.Context, userID, graphID, nodeID int64) (*models.Node, error)
 	AddDependency(ctx context.Context, userID, graphID int64, dependency *models.Dependency) (*models.Dependency, error)
 	RemoveDependensy(ctx context.Context, userID, graphID int64, dependency *models.Dependency) error
+	PredictGraph(ctx context.Context, userID, graphID int64) (*entities.PredictedGraph, error)
 }
 
 type Graphs struct {
@@ -288,4 +291,36 @@ func (g *Graphs) RemoveDependensy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (g *Graphs) PredictGraph(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(auth.UIDInterface{}).(int64)
+	graphID := r.Context().Value(GraphID{}).(int64)
+
+	predictedGraph, err := g.service.PredictGraph(r.Context(), userID, graphID)
+	if err != nil {
+		if errors.Is(err, service.ErrDenied) {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, service.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, service.ErrCycleInGraph) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, service.ErrSomeTasksNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		g.errorLog.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	jsontools.WtiteJSON(w, predictedGraph)
 }

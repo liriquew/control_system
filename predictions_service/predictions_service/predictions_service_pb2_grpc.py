@@ -34,39 +34,28 @@ class PredictionsStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.RecalculateAndSaveTask = channel.unary_unary(
-                '/predictions.Predictions/RecalculateAndSaveTask',
-                request_serializer=predictions__service_dot_predictions__service__pb2.RecalculateAndSaveTaskRequest.SerializeToString,
-                response_deserializer=predictions__service_dot_predictions__service__pb2.RecalculateAndSaveTaskResponse.FromString,
-                _registered_method=True)
-        self.Recalculete = channel.unary_unary(
-                '/predictions.Predictions/Recalculete',
-                request_serializer=predictions__service_dot_predictions__service__pb2.RecalculateRequest.SerializeToString,
-                response_deserializer=predictions__service_dot_predictions__service__pb2.RecalculateResponse.FromString,
-                _registered_method=True)
         self.Predict = channel.unary_unary(
                 '/predictions.Predictions/Predict',
                 request_serializer=predictions__service_dot_predictions__service__pb2.PredictRequest.SerializeToString,
                 response_deserializer=predictions__service_dot_predictions__service__pb2.PredictResponse.FromString,
+                _registered_method=True)
+        self.PredictList = channel.unary_unary(
+                '/predictions.Predictions/PredictList',
+                request_serializer=predictions__service_dot_predictions__service__pb2.PredictListRequest.SerializeToString,
+                response_deserializer=predictions__service_dot_predictions__service__pb2.PredictListResponse.FromString,
                 _registered_method=True)
 
 
 class PredictionsServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def RecalculateAndSaveTask(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Recalculete(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def Predict(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PredictList(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -75,20 +64,15 @@ class PredictionsServicer(object):
 
 def add_PredictionsServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'RecalculateAndSaveTask': grpc.unary_unary_rpc_method_handler(
-                    servicer.RecalculateAndSaveTask,
-                    request_deserializer=predictions__service_dot_predictions__service__pb2.RecalculateAndSaveTaskRequest.FromString,
-                    response_serializer=predictions__service_dot_predictions__service__pb2.RecalculateAndSaveTaskResponse.SerializeToString,
-            ),
-            'Recalculete': grpc.unary_unary_rpc_method_handler(
-                    servicer.Recalculete,
-                    request_deserializer=predictions__service_dot_predictions__service__pb2.RecalculateRequest.FromString,
-                    response_serializer=predictions__service_dot_predictions__service__pb2.RecalculateResponse.SerializeToString,
-            ),
             'Predict': grpc.unary_unary_rpc_method_handler(
                     servicer.Predict,
                     request_deserializer=predictions__service_dot_predictions__service__pb2.PredictRequest.FromString,
                     response_serializer=predictions__service_dot_predictions__service__pb2.PredictResponse.SerializeToString,
+            ),
+            'PredictList': grpc.unary_unary_rpc_method_handler(
+                    servicer.PredictList,
+                    request_deserializer=predictions__service_dot_predictions__service__pb2.PredictListRequest.FromString,
+                    response_serializer=predictions__service_dot_predictions__service__pb2.PredictListResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -100,60 +84,6 @@ def add_PredictionsServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Predictions(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def RecalculateAndSaveTask(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/predictions.Predictions/RecalculateAndSaveTask',
-            predictions__service_dot_predictions__service__pb2.RecalculateAndSaveTaskRequest.SerializeToString,
-            predictions__service_dot_predictions__service__pb2.RecalculateAndSaveTaskResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Recalculete(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/predictions.Predictions/Recalculete',
-            predictions__service_dot_predictions__service__pb2.RecalculateRequest.SerializeToString,
-            predictions__service_dot_predictions__service__pb2.RecalculateResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
 
     @staticmethod
     def Predict(request,
@@ -172,6 +102,33 @@ class Predictions(object):
             '/predictions.Predictions/Predict',
             predictions__service_dot_predictions__service__pb2.PredictRequest.SerializeToString,
             predictions__service_dot_predictions__service__pb2.PredictResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PredictList(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/predictions.Predictions/PredictList',
+            predictions__service_dot_predictions__service__pb2.PredictListRequest.SerializeToString,
+            predictions__service_dot_predictions__service__pb2.PredictListResponse.FromString,
             options,
             channel_credentials,
             insecure,

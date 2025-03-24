@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time_manage/internal/models"
+
+	"github.com/liriquew/control_system/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"

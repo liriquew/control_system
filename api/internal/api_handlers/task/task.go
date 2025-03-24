@@ -7,9 +7,10 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time_manage/internal/api_handlers/auth"
-	"time_manage/internal/models"
-	service "time_manage/internal/service/tasks"
+
+	"github.com/liriquew/control_system/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/internal/models"
+	service "github.com/liriquew/control_system/internal/service/tasks"
 
 	"github.com/go-chi/chi/v5"
 )

@@ -11,15 +11,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"time_manage/internal/config"
-	predictions "time_manage/internal/grpc/gen"
-	"time_manage/internal/models"
+	"github.com/liriquew/control_system/internal/config"
+	"github.com/liriquew/control_system/internal/entities"
+	pb2 "github.com/liriquew/control_system/internal/grpc/gen/predictions_service"
 
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 )
 
 type Client struct {
-	api predictions.PredictionsClient
+	api pb2.PredictionsClient
 	log *log.Logger
 }
 
@@ -35,7 +35,6 @@ func New(log *log.Logger, cfg *config.ServiceConfig) (*Client, error) {
 	cc, err := grpc.NewClient(connStr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(
-			// grpclog.UnaryClientInterceptor(InterceptorLogger(log), logOpts...),
 			grpcretry.UnaryClientInterceptor(retryOpts...),
 		),
 	)
@@ -44,7 +43,7 @@ func New(log *log.Logger, cfg *config.ServiceConfig) (*Client, error) {
 	}
 
 	return &Client{
-		api: predictions.NewPredictionsClient(cc),
+		api: pb2.NewPredictionsClient(cc),
 		log: log,
 	}, nil
 }
@@ -54,35 +53,10 @@ var (
 	ErrInvalidArgument    = fmt.Errorf("invalid argument")
 )
 
-func (c *Client) RecalculateAndSaveTask(ctx context.Context, uid int64, task *models.Task) error {
-	const op = "predictions_client.RecalculateAndSaveTask"
-
-	_, err := c.api.RecalculateAndSaveTask(ctx, &predictions.RecalculateAndSaveTaskRequest{
-		ID:          task.ID,
-		UID:         uid,
-		Title:       task.Title,
-		Description: task.Description,
-		PlannedTime: task.PlannedTime,
-		ActualTime:  *task.ActualTime,
-	})
-
-	if err != nil {
-		if st, ok := status.FromError(err); ok {
-			switch st.Code() {
-			case codes.InvalidArgument:
-				return fmt.Errorf("%w: %s", ErrInvalidArgument, st.Message())
-			}
-		}
-		return fmt.Errorf("%s: %w", op, err)
-	}
-
-	return nil
-}
-
 func (c *Client) Predict(ctx context.Context, uid int64, plannedTime float64) (float64, error) {
 	const op = "predictions_client.Predict"
 
-	resp, err := c.api.Predict(ctx, &predictions.PredictRequest{
+	resp, err := c.api.Predict(ctx, &pb2.PredictRequest{
 		UID:         uid,
 		PlannedTime: plannedTime,
 	})
@@ -101,23 +75,28 @@ func (c *Client) Predict(ctx context.Context, uid int64, plannedTime float64) (f
 	return resp.ActualTime, nil
 }
 
-func (c *Client) Recalculate(ctx context.Context, uid int64) error {
-	const op = "predictions_client.Recalculate"
+func (c *Client) PredictList(ctx context.Context, nodesWithTask []*entities.NodeWithTask) (*entities.PredictedNodes, error) {
+	const op = "predictions_client.PredictList"
 
-	_, err := c.api.Recalculete(ctx, &predictions.RecalculateRequest{
-		UID: uid,
-	})
-	if err != nil {
-		if st, ok := status.FromError(err); ok {
-			switch st.Code() {
-			case codes.FailedPrecondition:
-				return fmt.Errorf("%w: %s", ErrFailedPrecondition, st.Message())
-			case codes.InvalidArgument:
-				return fmt.Errorf("%w: %s", ErrInvalidArgument, st.Message())
-			}
+	PlannedUserTime := make([]*pb2.UserWithTime, len(nodesWithTask))
+	for i, node := range nodesWithTask {
+		fmt.Println(*node.Node.AssignedTo)
+		PlannedUserTime[i] = &pb2.UserWithTime{
+			UID:  *node.Node.AssignedTo,
+			Time: node.Task.PlannedTime,
 		}
-		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	return nil
+	resp, err := c.api.PredictList(ctx, &pb2.PredictListRequest{
+		PlannedUserTime: PlannedUserTime,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for i, PredictedUserTime := range resp.PredictedUserTime {
+		nodesWithTask[i].PredictedTime = PredictedUserTime.Time
+	}
+
+	return &entities.PredictedNodes{Nodes: nodesWithTask, UnpredictedUIDs: resp.UnpredictedUIDs}, nil
 }
