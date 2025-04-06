@@ -1,1 +1,3 @@
 predictions_service/venv
+predictions_service/__pycache__
+.VSCodeCounter
