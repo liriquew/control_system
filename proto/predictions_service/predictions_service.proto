@@ -20,8 +20,9 @@ message PredictResponse {
 }
 
 message UserWithTime {
-    int64 UID = 1;
-    double Time = 2;
+    int64 ID = 1;
+    int64 UID = 2;
+    double Time = 3;
 }
 
 message PredictListRequest {

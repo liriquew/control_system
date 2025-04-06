@@ -1,0 +1,14 @@
+service_config:
+  port: 50052
+  host: localhost
+postgres:
+  username: postgres
+  password: passw0rd
+  host: localhost
+  port: 5432
+  db_name: control_system_predictions
+kafka:
+  bootstrap_servers: "localhost:9093"
+  topic: "predictions"
+  group_id: "predictions"
+  delete_topic: "predictions_delete"

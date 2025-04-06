@@ -1,0 +1,9 @@
+postgres:
+  username: postgres
+  password: passw0rd
+  host: localhost
+  port: 5432
+  db_name: control_system_db
+predictions_service:
+  host: localhost
+  port: 4041

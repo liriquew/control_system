@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+package groups;
+
+option go_package = "github.com/liriquew/control_system/services_protos;groups";
+
+service Groups {
+    rpc CreateGroup(Group) returns (GroupID);
+    rpc ListUserGroups(Padding) returns (GroupsList);
+    rpc GetGroup(GroupID) returns (Group);
+    rpc DeleteGroup(GroupID) returns (google.protobuf.Empty);
+    rpc UpdateGroup(Group) returns (google.protobuf.Empty);
+    rpc ListGroupMembers(GroupID) returns (GroupMembersList);
+    rpc AddGroupMember(GroupMember) returns (google.protobuf.Empty);
+    rpc RemoveGroupMember(GroupMember) returns (google.protobuf.Empty);
+    rpc ChangeMemberRole(GroupMember) returns (google.protobuf.Empty);
+
+    rpc CheckAdminPermission(GroupMember) returns (google.protobuf.Empty);
+    rpc CheckEditorPermission(GroupMember) returns (google.protobuf.Empty);
+    rpc CheckMemberPermission(GroupMember) returns (google.protobuf.Empty);
+}
+
+message Group {
+    int64 ID = 1;
+    int64 OwnerID = 2;
+    string Name = 3;
+    string Description = 4;
+    google.protobuf.Timestamp CreatedAt = 5;
+}
+
+message GroupID {
+    int64 ID = 1;
+}
+
+message GroupsList {
+    repeated Group Groups = 1;
+}
+
+message Padding {
+    int64 Padding = 1;
+}
+
+
+message GroupMember {
+	int64 GroupID = 1;  
+	int64 UserID = 2;  
+	string Role = 3; 
+}
+
+message GroupMembersList {
+    repeated GroupMember Members = 1;
+}

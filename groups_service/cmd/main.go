@@ -1,0 +1,34 @@
+package main
+
+import (
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/liriquew/groups_service/internal/app"
+	"github.com/liriquew/groups_service/internal/lib/config"
+	logger "github.com/liriquew/groups_service/pkg/logger"
+)
+
+func main() {
+	cfg := config.MustLoad()
+
+	log := logger.SetupPrettySlog("Groups")
+
+	log.Info("", slog.Any("CONFIG", cfg))
+
+	application := app.New(log, cfg)
+
+	go func() {
+		application.GRPCServer.MustRun()
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	<-stop
+
+	application.Stop()
+	log.Info("Gracefully stopped")
+}

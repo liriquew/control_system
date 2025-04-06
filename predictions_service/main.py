@@ -10,7 +10,8 @@ from google.protobuf.internal import containers as _containers
 
 from predictions import Predicator, PredicatorException
 from config import ConfigLoader
-
+from database import Database
+from consumer import KafkaMLConsumer
 
 class PredictService(pb2_grpc.PredictionsServicer):
     def __init__(self, config: Dict[str, Any]):
@@ -51,8 +52,12 @@ def serve():
     app_config = ConfigLoader()
     service_config = app_config.get_service_config()
 
+    db = Database(app_config.get_database_config())
+
+    consumer = KafkaMLConsumer(app_config.get_kafka_config(), db)
+
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    pb2_grpc.add_PredictionsServicer_to_server(PredictService(app_config), server)
+    pb2_grpc.add_PredictionsServicer_to_server(PredictService(db), server)
     
     conn_str = f"{service_config["host"]}:{service_config["port"]}"
     server.add_insecure_port(conn_str)
@@ -65,6 +70,7 @@ def serve():
     signal.signal(signal.SIGTERM, handle_signal)
 
     print(f"Server running on {conn_str}")
+    consumer.start()
     server.start()
     server.wait_for_termination()
 

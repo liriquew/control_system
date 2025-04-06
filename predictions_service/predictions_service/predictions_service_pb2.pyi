@@ -22,12 +22,14 @@ class PredictResponse(_message.Message):
     def __init__(self, ActualTime: _Optional[float] = ..., Status: _Optional[str] = ...) -> None: ...
 
 class UserWithTime(_message.Message):
-    __slots__ = ("UID", "Time")
+    __slots__ = ("ID", "UID", "Time")
+    ID_FIELD_NUMBER: _ClassVar[int]
     UID_FIELD_NUMBER: _ClassVar[int]
     TIME_FIELD_NUMBER: _ClassVar[int]
+    ID: int
     UID: int
     Time: float
-    def __init__(self, UID: _Optional[int] = ..., Time: _Optional[float] = ...) -> None: ...
+    def __init__(self, ID: _Optional[int] = ..., UID: _Optional[int] = ..., Time: _Optional[float] = ...) -> None: ...
 
 class PredictListRequest(_message.Message):
     __slots__ = ("PlannedUserTime",)

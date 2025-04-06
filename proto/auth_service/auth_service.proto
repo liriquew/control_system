@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/liriquew/control_system/services_protos;auth";
+
+
+service Auth {
+    rpc SignIn(UserCredentials) returns (JWT);
+    rpc SignUp(UserCredentials) returns (JWT);
+    rpc Authenticate(JWT) returns (UserID);
+}
+
+message UserCredentials {
+    string Username = 1;
+    string Password = 2;
+}
+
+message JWT {
+    string JWT = 1;
+}
+
+message UserID {
+    int64 ID = 1;
+}

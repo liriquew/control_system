@@ -10,7 +10,7 @@ class ConfigLoader:
         """
         Инициализация класса ConfigLoader.
         """
-        self.config_path = "./config.yaml"
+        self.config_path = "./config/config.yaml"
         if os.getenv("DOCKER_CONFIG") is not None:
             self.config_path = os.getenv("DOCKER_CONFIG")
         
@@ -46,15 +46,18 @@ class ConfigLoader:
         """
         Возвращает параметры подключения к базе данных.
         """
-        app_config = self.config.get('predictions_service')
+        app_config = self.config.get('service_config')
         if not app_config:
-            raise KeyError("В конфигурации отсутствует секция 'predictions_service'.")
+            raise KeyError("В конфигурации отсутствует секция 'service_config'.")
 
         return app_config
+    
+    def get_kafka_config(self) -> dict:
+        """
+        Возвращает параметры для брокера
+        """
+        app_config = self.config.get('kafka')
+        if not app_config:
+            raise KeyError("В конфигурации отсутствует секция 'kafka'.")
 
-
-print(ConfigLoader().config)
-
-import os
-
-print(os.getenv("DOCKER_CONFIG"))
+        return app_config

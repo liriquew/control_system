@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+package tasks;
+
+option go_package = "github.com/liriquew/control_system/services_protos/tasks_service;tasks";
+
+service Tasks {
+    rpc CreateTask(Task) returns (TaskID);
+    rpc GetTask(TaskID) returns (Task);
+    rpc GetTaskList(TaskListRequest) returns (TaskList);
+    rpc UpdateTask(Task) returns (google.protobuf.Empty);
+    rpc DeleteTask(TaskID) returns (google.protobuf.Empty);
+    rpc PredictTask(TaskID) returns (PredictedTask);
+
+    rpc TaskExists(TaskExistsRequest) returns (google.protobuf.Empty);
+    rpc GetGroupTasks(GroupID) returns (TaskList);
+    rpc GetPredictedTasks(TasksIDs) returns (PredictedTaskList);
+    rpc TaskDone(TaskDoneRequest) returns (google.protobuf.Empty);
+}
+
+message Task {
+    int64 ID = 1;
+    int64 CreatedBy = 2;
+    int64 AssignedTo = 3;
+    int64 GroupID = 4;
+    string Title = 5;
+    string Description = 6;
+    double PlannedTime = 7;
+    double ActualTime = 8;
+    google.protobuf.Timestamp CreatedAt = 9;
+}
+
+message TaskList {
+    repeated Task Tasks = 1;
+}
+
+message TaskID {
+    int64 ID = 1;
+}
+
+message GroupID {
+    int64 ID = 1;
+}
+
+message TaskExistsRequest {
+    int64 TaskID = 1;
+    int64 GroupID = 2;
+}
+
+message TaskListRequest {
+    int64 Padding = 1;
+}
+
+message PredictedTask {
+    Task Task = 1;
+    double PredictedTime = 2;
+}
+
+message PredictedTaskList {
+    repeated PredictedTask Tasks = 1;
+    repeated int64 UnpredictedUIDs = 2;
+}
+
+message TasksIDs {
+    repeated int64 IDs = 1; 
+}
+
+message TaskTimes {
+    int64 ID = 1;
+    double PlannedTime = 2;
+    double ActualTime = 3;
+}
+
+message TasksTimes {
+    repeated TaskTimes Times = 1;
+}
+
+message TaskDoneRequest {
+    int64 TaskID = 1;
+    double Time = 2;
+}

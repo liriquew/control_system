@@ -65,14 +65,11 @@ class Database():
                 INSERT INTO models (user_id, model, is_active) 
                 VALUES (%s, %s, %s) 
                 ON CONFLICT (user_id) DO UPDATE 
-                SET model = EXCLUDED.model, is_active=true RETURNING id""",
+                SET model = EXCLUDED.model, is_active=true""",
                 (UID, psycopg2.Binary(model_binary), True)
             )
-            model_id = cursor.fetchone()[0]
 
             self.conn.commit()
-            print(f"model saved id: {model_id}")
-            return model_id
         except Exception as e:
             self.conn.rollback()
             print(f"database.Database.save_model(): Error while saving model: {e}")
@@ -127,6 +124,46 @@ class Database():
         except Exception as e:
             self.conn.rollback()
             print(f"database.Database.get_user_tasks(): Error while retrieving user tasks: {e}")
+            raise e
+        finally:
+            cursor.close()
+
+    
+    def save_task_prediction_data(self, task_id: int, UID: int, planned_time: float, actual_time: float, tokens: list[str] = None):
+        try:
+            cursor = self.conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO tasks (id, user_id, planned_time, actual_time) 
+                VALUES (%s, %s, %s, %s) 
+                ON CONFLICT (id) DO UPDATE 
+                SET planned_time=EXCLUDED.planned_time, actual_time=EXCLUDED.actual_time""",
+                (task_id, UID, planned_time, actual_time)
+            )
+
+            self.conn.commit()
+            print("task data saved")
+        except Exception as e:
+            self.conn.rollback()
+            print(f"database.Database.save_task_prediction_data(): Error while saving task data: {e}")
+            raise e
+        finally:
+            cursor.close()
+
+    def delete_task_prediction_data(self, task_id: int):
+        try:
+            cursor = self.conn.cursor()
+            
+            cursor.execute("""
+                DELETE FROM tasks WHERE id=%s""",
+                (task_id,)
+            )
+
+            self.conn.commit()
+            print("task data deleted")
+        except Exception as e:
+            self.conn.rollback()
+            print(f"database.Database.save_task_prediction_data(): Error while deleting task data: {e}")
             raise e
         finally:
             cursor.close()

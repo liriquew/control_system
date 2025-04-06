@@ -1,0 +1,32 @@
+service_config:
+  port: 50054
+auth_service:
+  host: localhost
+  port: 50051
+  timeout: 1s
+  retries: 1
+predictions_service:
+  host: localhost
+  port: 50052
+  timeout: 1s
+  retries: 1
+groups_service:
+  host: localhost
+  port: 50053
+  timeout: 1s
+  retries: 1
+graphs_service:
+  host: localhost
+  port: 50055
+  timeout: 1s
+  retries: 1
+postgres:
+  username: postgres
+  password: passw0rd
+  host: localhost
+  port: 5432
+  db_name: control_system_tasks
+kafka:
+  bootstrap_servers: "localhost:9093"
+  topic: "predictions"
+  topic_delete: "predictions_delete"

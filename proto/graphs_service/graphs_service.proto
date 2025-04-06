@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "tasks_service/tasks_service.proto";
+
+package graphs;
+
+option go_package = "github.com/liriquew/control_system/services_protos/graphs;graphs";
+
+service Graphs {
+    rpc CreateGroupGraph(GraphWithNodes) returns (GraphResponse);
+    rpc ListGroupGraphs(ListGroupGraphsRequest) returns (GraphListResponse);
+    rpc GetGraph(GetGraphRequest) returns (GraphWithNodes);
+    rpc GetNode(GetNodeRequest) returns (NodeResponse);
+    rpc CreateNode(CreateNodeRequest) returns (NodeResponse);
+    rpc UpdateNode(UpdateNodeRequest) returns (google.protobuf.Empty);
+    rpc RemoveNode(RemoveNodeRequest) returns (google.protobuf.Empty);
+    rpc GetDependencies(GetDependenciesRequest) returns (NodeWithDependencies);
+    rpc AddDependency(DependencyRequest) returns (google.protobuf.Empty);
+    rpc RemoveDependency(DependencyRequest) returns (google.protobuf.Empty);
+    rpc NodeDone(NodeDoneRequest) returns (google.protobuf.Empty);
+    rpc PredictGraph(PredictGraphRequest) returns (PredictedGraphResponse);
+
+    rpc TaskInNode(TaskInNodeRequest) returns (TaskInNodeResponse);
+}
+
+// Base Entities
+message Graph {
+    int64 ID = 1;
+    string Name = 2;
+    int64 GroupID = 3;
+    int64 CreatedBy = 4;
+}
+
+message Node {
+    int64 ID = 1;
+    int64 GraphID = 2;
+    int64 TaskID = 3;
+    repeated int64 DependencyNodeIDs = 5;
+}
+
+message Dependency {
+    int64 FromNodeID = 1;
+    int64 ToNodeID = 2;
+}
+
+message GraphWithNodes {
+    Graph GraphInfo = 1;
+    repeated Node Nodes = 2;
+}
+
+message Path {
+    repeated int64 NodeIDs = 1;
+}
+
+// Request/Response Messages
+message GraphResponse {
+    int64 GraphID = 1;
+}
+
+message ListGroupGraphsRequest {
+    int64 GroupID = 2;
+}
+
+message GraphListResponse {
+    repeated GraphWithNodes Graphs = 1;
+}
+
+message GetGraphRequest {
+    int64 GraphID = 2;
+}
+
+message GetNodeRequest {
+    int64 GraphID = 1;
+    int64 NodeID = 2;
+}
+
+message NodeResponse {
+    Node Node = 1;
+}
+
+message CreateNodeRequest {
+    Node Node = 2;
+}
+
+message UpdateNodeRequest {
+    Node Node = 2;
+}
+
+message RemoveNodeRequest {
+    int64 GraphID = 1;
+    int64 NodeID = 2;
+}
+
+message GetDependenciesRequest {
+    int64 GraphID = 1;
+    int64 NodeID = 2;
+}
+
+message NodeWithDependencies {
+    Node Node = 1;
+}
+
+message DependencyRequest {
+    int64 GraphID = 1;
+    Dependency Dependency = 2;
+}
+
+message PredictGraphRequest {
+    int64 GraphID = 1;
+}
+
+message NodeWithTask {
+    Node Node = 1;
+    tasks.Task Task = 2;
+    repeated int64 AdditionalDependencies = 3;
+    double PredictedTime = 4;
+}
+
+message PredictedGraphResponse {
+    Graph Graph = 1;
+    repeated NodeWithTask Nodes = 2;
+    repeated int64 UnpredictedUIDs = 3;
+    repeated Path Paths = 4;
+}
+
+message NodeDoneRequest {
+    int64 nodeID = 1;
+}
+
+message TaskInNodeRequest {
+    int64 TaskID = 1;
+}
+
+message TaskInNodeResponse {
+    int64 NodeID = 1;
+}

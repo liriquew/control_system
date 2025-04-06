@@ -1,0 +1,23 @@
+service_config:
+  port: 50055
+auth_service:
+  host: localhost
+  port: 50051
+  timeout: 1s
+  retries: 1
+groups_service:
+  host: localhost
+  port: 50053
+  timeout: 1s
+  retries: 1
+tasks_service:
+  host: localhost
+  port: 50054
+  timeout: 1s
+  retries: 1
+postgres:
+  username: postgres
+  password: passw0rd
+  host: localhost
+  port: 5432
+  db_name: control_system_graphs

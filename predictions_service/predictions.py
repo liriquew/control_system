@@ -38,8 +38,8 @@ class Predicator():
     ]
 
 
-    def __init__(self, config: ConfigLoader):
-        self.db = Database(config.get_database_config())
+    def __init__(self, db:Database):
+        self.db = db
 
 
     def get_model_params(self, sample_size: int):
