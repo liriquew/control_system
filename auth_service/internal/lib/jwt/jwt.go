@@ -6,7 +6,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var Secret string
+var Secret string = "AnyEps"
 
 // NewToken creates new JWT token for given user and app.
 func NewToken(UID int64) (string, error) {

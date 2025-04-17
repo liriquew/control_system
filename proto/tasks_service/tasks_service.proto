@@ -39,6 +39,7 @@ message TaskList {
 
 message TaskID {
     int64 ID = 1;
+    int64 GroupID = 2;
 }
 
 message GroupID {
@@ -57,6 +58,7 @@ message TaskListRequest {
 message PredictedTask {
     Task Task = 1;
     double PredictedTime = 2;
+    bool Predicted = 3;
 }
 
 message PredictedTaskList {

@@ -46,7 +46,7 @@ func TestSignUp_Success(t *testing.T) {
 	assert.NotEmpty(t, response.Token)
 
 	tokenParsed, err := jwt.Parse(response.Token, func(token *jwt.Token) (interface{}, error) {
-		return []byte("anyEps"), nil
+		return []byte("AnyEps"), nil
 	})
 
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestSignIn_Success(t *testing.T) {
 	assert.NotEmpty(t, response.Token)
 
 	tokenParsed, err := jwt.Parse(response.Token, func(token *jwt.Token) (interface{}, error) {
-		return []byte("anyEps"), nil
+		return []byte("AnyEps"), nil
 	})
 
 	require.NoError(t, err)
@@ -129,7 +129,7 @@ func TestSignIn_InvalidCredentials(t *testing.T) {
 	resp := doSignIn(t, ts, invalidUser)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
 func doSignUp(t *testing.T, ts *suite.Suite, user models.User) *http.Response {

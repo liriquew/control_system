@@ -3,9 +3,8 @@ package groups
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"strings"
+	"strconv"
 
 	grpc_pb "github.com/liriquew/control_system/services_protos/groups_service"
 	authclient "github.com/liriquew/groups_service/internal/grpc/clients/auth_client"
@@ -30,7 +29,7 @@ type GroupsRepository interface {
 	DeleteGroup(ctx context.Context, ownerID, groupID int64) error
 	UpdateGroup(ctx context.Context, group *grpc_pb.Group) error
 	ListGroupMembers(ctx context.Context, groupID int64) ([]*models.GroupMember, error)
-	AddGroupMember(ctx context.Context, ownerID int64, member *grpc_pb.GroupMember) error
+	AddGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error
 	RemoveGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error
 	ChangeMemberRole(ctx context.Context, ownerID int64, member *grpc_pb.GroupMember) error
 }
@@ -58,35 +57,16 @@ func (s *serverAPI) Authenticate(ctx context.Context) (int64, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		s.log.Error("error while extracting metadata")
-		return 0, status.Error(codes.Unauthenticated, "missing jwt token")
+		return 0, status.Error(codes.Unauthenticated, "missing metadata")
 	}
 
-	AuthParams := md.Get("Authorization")
-	if !ok || len(AuthParams) == 0 {
-		return 0, status.Error(codes.Unauthenticated, "missing jwt token")
+	AuthParams := md.Get("user-id")
+	if len(AuthParams) == 0 {
+		return 0, status.Error(codes.Unauthenticated, "missing user-idmetadata")
 	}
-	token := AuthParams[0]
-	if token == "" {
-		return 0, status.Error(codes.Unauthenticated, "missing jwt token")
-	}
-
-	token, found := strings.CutPrefix(token, "Bearer ")
-	if !found {
-		return 0, status.Error(codes.Unauthenticated, "missing jwt token")
-	}
-
-	userID, err := s.authClient.Authenticate(ctx, token)
+	userID, err := strconv.ParseInt(AuthParams[0], 10, 64)
 	if err != nil {
-		if errors.Is(err, authclient.ErrDeny) {
-			return 0, status.Error(codes.Unauthenticated, "denied")
-		}
-		if errors.Is(err, authclient.ErrMissedJWT) {
-			return 0, status.Error(codes.Unauthenticated, "missing jwt")
-		}
-
-		s.log.Error("error while authenticate", sl.Err(err))
-
-		return 0, status.Error(codes.Internal, fmt.Errorf("internal error: %w", err).Error())
+		return 0, status.Error(codes.Unauthenticated, "invalid user-id metadata")
 	}
 
 	return userID, nil
@@ -100,15 +80,12 @@ func (s *serverAPI) CreateGroup(ctx context.Context, group *grpc_pb.Group) (*grp
 	}
 	group.OwnerID = userID
 
-	if group.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "empty name")
-	}
-	if group.Description == "" {
-		return nil, status.Error(codes.InvalidArgument, "empty description")
-	}
-
 	groupID, err := s.repository.CreateGroup(ctx, group)
 	if err != nil {
+		if errors.Is(err, repository.ErrInvalideRole) {
+			return nil, status.Error(codes.InvalidArgument, "invalide role param")
+		}
+
 		s.log.Error("error while creating group", sl.Err(err))
 		return nil, err
 	}
@@ -126,11 +103,7 @@ func (s *serverAPI) ListUserGroups(ctx context.Context, padding *grpc_pb.Padding
 	}
 
 	groups, err := s.repository.ListUserGroups(ctx, userID, padding.Padding)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "nothing found")
-		}
-
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		s.log.Error("error while listing user's groups", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
 	}
@@ -139,6 +112,8 @@ func (s *serverAPI) ListUserGroups(ctx context.Context, padding *grpc_pb.Padding
 	for _, g := range groups {
 		resp = append(resp, models.ConvertGroupToProto(g))
 	}
+
+	s.log.Debug("grouos", slog.Any("groups", resp))
 
 	return &grpc_pb.GroupsList{
 		Groups: resp,
@@ -189,10 +164,6 @@ func (s *serverAPI) DeleteGroup(ctx context.Context, groupID *grpc_pb.GroupID) (
 	}
 
 	if err := s.repository.DeleteGroup(ctx, userID, groupID.ID); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "nothing found")
-		}
-
 		s.log.Error("error while deleting group member", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
 	}
@@ -221,9 +192,6 @@ func (s *serverAPI) UpdateGroup(ctx context.Context, group *grpc_pb.Group) (*emp
 		if errors.Is(err, repository.ErrNotFound) {
 			return &emptypb.Empty{}, status.Error(codes.NotFound, "group not found")
 		}
-		if errors.Is(err, repository.ErrNothingToUpdate) {
-			return &emptypb.Empty{}, status.Error(codes.InvalidArgument, "nothing to update")
-		}
 
 		s.log.Error("error while updating group", sl.Err(err))
 		return &emptypb.Empty{}, status.Error(codes.Internal, "internal")
@@ -249,10 +217,6 @@ func (s *serverAPI) ListGroupMembers(ctx context.Context, groupID *grpc_pb.Group
 
 	members, err := s.repository.ListGroupMembers(ctx, groupID.ID)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "group not found")
-		}
-
 		s.log.Error("error while listing group members", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
 	}
@@ -282,7 +246,7 @@ func (s *serverAPI) AddGroupMember(ctx context.Context, GroupMember *grpc_pb.Gro
 		return nil, status.Error(codes.Internal, "internal")
 	}
 
-	if err := s.repository.AddGroupMember(ctx, userID, GroupMember); err != nil {
+	if err := s.repository.AddGroupMember(ctx, GroupMember); err != nil {
 		if errors.Is(err, repository.ErrNotExists) {
 			return nil, status.Error(codes.NotFound, "group not found")
 		}
@@ -317,10 +281,6 @@ func (s *serverAPI) RemoveGroupMember(ctx context.Context, GroupMember *grpc_pb.
 	}
 
 	if err := s.repository.RemoveGroupMember(ctx, GroupMember); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "member not found")
-		}
-
 		s.log.Error("error while removing group member", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
 	}
@@ -346,6 +306,9 @@ func (s *serverAPI) ChangeMemberRole(ctx context.Context, GroupMember *grpc_pb.G
 	if err := s.repository.ChangeMemberRole(ctx, userID, GroupMember); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "member not found")
+		}
+		if errors.Is(err, repository.ErrInvalideRole) {
+			return nil, status.Error(codes.InvalidArgument, "bad role")
 		}
 
 		s.log.Error("error while updating group member", sl.Err(err))

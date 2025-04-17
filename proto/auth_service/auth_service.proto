@@ -9,6 +9,7 @@ service Auth {
     rpc SignIn(UserCredentials) returns (JWT);
     rpc SignUp(UserCredentials) returns (JWT);
     rpc Authenticate(JWT) returns (UserID);
+    rpc GetUsersDetails(UserIDs) returns (ListUserDetails);
 }
 
 message UserCredentials {
@@ -22,4 +23,17 @@ message JWT {
 
 message UserID {
     int64 ID = 1;
+}
+
+message UserIDs {
+    repeated int64 UserIDs = 1;
+}
+
+message UserProfileDetails {
+    int64 UserID = 1;
+    string Username = 2;
+}
+
+message ListUserDetails {
+    repeated UserProfileDetails Users = 1;
 }

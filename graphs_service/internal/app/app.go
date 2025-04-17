@@ -9,7 +9,6 @@ import (
 	"github.com/liriquew/graphs_service/pkg/logger/sl"
 
 	authclient "github.com/liriquew/graphs_service/internal/grpc/clients/auth"
-	groupsclient "github.com/liriquew/graphs_service/internal/grpc/clients/groups"
 	tasksclient "github.com/liriquew/graphs_service/internal/grpc/clients/tasks"
 
 	grpcapp "github.com/liriquew/graphs_service/internal/app/grpc_app"
@@ -33,17 +32,12 @@ func New(log *slog.Logger, cfg config.AppConfig) *App {
 		panic(err)
 	}
 
-	groupsClient, err := groupsclient.NewGroupsClient(log, cfg.GroupsClient)
-	if err != nil {
-		panic(err)
-	}
-
 	tasksClient, err := tasksclient.NewTasksClient(log, cfg.TasksClient)
 	if err != nil {
 		panic(err)
 	}
 
-	graphsService := graphsservice.NewServerAPI(log, storage, authClient, tasksClient, groupsClient)
+	graphsService := graphsservice.NewServerAPI(log, storage, authClient, tasksClient)
 
 	app := grpcapp.New(log, graphsService, cfg.ServiceConfig.Port)
 

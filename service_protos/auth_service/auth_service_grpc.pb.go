@@ -25,6 +25,7 @@ type AuthClient interface {
 	SignIn(ctx context.Context, in *UserCredentials, opts ...grpc.CallOption) (*JWT, error)
 	SignUp(ctx context.Context, in *UserCredentials, opts ...grpc.CallOption) (*JWT, error)
 	Authenticate(ctx context.Context, in *JWT, opts ...grpc.CallOption) (*UserID, error)
+	GetUsersDetails(ctx context.Context, in *UserIDs, opts ...grpc.CallOption) (*ListUserDetails, error)
 }
 
 type authClient struct {
@@ -62,6 +63,15 @@ func (c *authClient) Authenticate(ctx context.Context, in *JWT, opts ...grpc.Cal
 	return out, nil
 }
 
+func (c *authClient) GetUsersDetails(ctx context.Context, in *UserIDs, opts ...grpc.CallOption) (*ListUserDetails, error) {
+	out := new(ListUserDetails)
+	err := c.cc.Invoke(ctx, "/auth.Auth/GetUsersDetails", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServer is the server API for Auth service.
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility
@@ -69,6 +79,7 @@ type AuthServer interface {
 	SignIn(context.Context, *UserCredentials) (*JWT, error)
 	SignUp(context.Context, *UserCredentials) (*JWT, error)
 	Authenticate(context.Context, *JWT) (*UserID, error)
+	GetUsersDetails(context.Context, *UserIDs) (*ListUserDetails, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -84,6 +95,9 @@ func (UnimplementedAuthServer) SignUp(context.Context, *UserCredentials) (*JWT, 
 }
 func (UnimplementedAuthServer) Authenticate(context.Context, *JWT) (*UserID, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Authenticate not implemented")
+}
+func (UnimplementedAuthServer) GetUsersDetails(context.Context, *UserIDs) (*ListUserDetails, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUsersDetails not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
 
@@ -152,6 +166,24 @@ func _Auth_Authenticate_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_GetUsersDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserIDs)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).GetUsersDetails(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/auth.Auth/GetUsersDetails",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).GetUsersDetails(ctx, req.(*UserIDs))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Auth_ServiceDesc is the grpc.ServiceDesc for Auth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -170,6 +202,10 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Authenticate",
 			Handler:    _Auth_Authenticate_Handler,
+		},
+		{
+			MethodName: "GetUsersDetails",
+			Handler:    _Auth_GetUsersDetails_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -21,7 +21,7 @@ type GraphsRepository struct {
 	db *sqlx.DB
 }
 
-const listTasksBatchSize = 10
+const listGraphsBatchSize = 10
 
 func NewGraphsRepository(cfg config.StorageConfig) (*GraphsRepository, error) {
 	const op = "storage.postgres.New"
@@ -53,8 +53,9 @@ func (s *GraphsRepository) Close() error {
 }
 
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrNotExists = errors.New("not exists")
+	ErrNotFound      = errors.New("not found")
+	ErrNotExists     = errors.New("not exists")
+	ErrAlreadyExists = errors.New("already exists")
 
 	ErrSelfDependencyRejected = errors.New("found self dependency")
 	ErrNothingToUpdate        = errors.New("nothing to update")
@@ -85,7 +86,6 @@ func (r *GraphsRepository) CreateGraph(ctx context.Context, graph *grph_pb.Graph
 	}
 	defer txn.Rollback()
 
-	// TODO: add constraint in postgres unique name and check err
 	graphQuery := `INSERT INTO graphs (group_id, created_by, name) VALUES ($1, $2, $3) RETURNING id`
 	err = txn.QueryRowContext(ctx, graphQuery, graph.GroupID, graph.CreatedBy, graph.Name).Scan(&graph.ID)
 	if err != nil {
@@ -116,7 +116,6 @@ func (r *GraphsRepository) CreateGraph(ctx context.Context, graph *grph_pb.Graph
 	}
 
 	// Зависимости
-	// TODO: add constraint in postgres nodes in one graph
 	dependencyQuery := `INSERT INTO dependencies (from_node_id, to_node_id, graph_id) VALUES ($1, $2, $3)`
 	stmt, err := txn.PrepareContext(ctx, dependencyQuery)
 	if err != nil {
@@ -152,11 +151,11 @@ func (r *GraphsRepository) CreateGraph(ctx context.Context, graph *grph_pb.Graph
 	return graph.ID, nil
 }
 
-func (r *GraphsRepository) ListGroupGraphs(ctx context.Context, userID int64, groupID int64) ([]*entities.GraphWithNodes, error) {
-	query := `SELECT * FROM graphs WHERE group_id=$1`
+func (r *GraphsRepository) ListGroupGraphs(ctx context.Context, groupID, padding int64) ([]*entities.GraphWithNodes, error) {
+	query := `SELECT * FROM graphs WHERE group_id=$1 offset $2 limit $3`
 
 	var graphs []models.Graph
-	err := r.db.SelectContext(ctx, &graphs, query, groupID)
+	err := r.db.SelectContext(ctx, &graphs, query, groupID, padding, listGraphsBatchSize)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -380,6 +379,7 @@ func (r *GraphsRepository) GetDependencies(ctx context.Context, nodeID int64) (*
 
 func (r *GraphsRepository) AddDependency(ctx context.Context, graphID int64, dependency *grph_pb.Dependency) error {
 	query := "INSERT INTO dependencies (from_node_id, to_node_id, graph_id) VALUES ($1, $2, $3)"
+	// TODO: add constraint A -> B; B -> A will be rejected
 	if _, err := r.db.ExecContext(ctx, query, dependency.FromNodeID, dependency.ToNodeID, graphID); err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code {
@@ -389,6 +389,11 @@ func (r *GraphsRepository) AddDependency(ctx context.Context, graphID int64, dep
 					return fmt.Errorf("node with id %d does not exist%w", dependency.FromNodeID, ErrNotExists)
 				case "fk_to_node_dependency":
 					return fmt.Errorf("node with id %d does not exist%w", dependency.ToNodeID, ErrNotExists)
+				}
+			case "23505":
+				switch pqErr.Constraint {
+				case "unique_violation":
+					return ErrAlreadyExists
 				}
 			case "23514": // Код ошибки для CHECK violation
 				if pqErr.Constraint == "no_self_dependency" {

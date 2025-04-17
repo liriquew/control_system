@@ -6,6 +6,11 @@ import (
 	"net/http"
 )
 
+const (
+	headerContentType = "Content-Type"
+	jsonContentType   = "application/json"
+)
+
 type Int64String int64
 type float64String float64
 
@@ -22,9 +27,13 @@ type ResponseID struct {
 }
 
 func WriteInt64ID(w http.ResponseWriter, id int64) {
-	json.NewEncoder(w).Encode(Int64String(id))
+	w.Header().Set(headerContentType, jsonContentType)
+	json.NewEncoder(w).Encode(ResponseID{
+		ID: Int64String(id),
+	})
 }
 
 func WtiteJSON(w http.ResponseWriter, val any) {
+	w.Header().Set(headerContentType, jsonContentType)
 	json.NewEncoder(w).Encode(val)
 }

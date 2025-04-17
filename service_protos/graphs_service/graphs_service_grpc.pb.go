@@ -33,7 +33,6 @@ type GraphsClient interface {
 	GetDependencies(ctx context.Context, in *GetDependenciesRequest, opts ...grpc.CallOption) (*NodeWithDependencies, error)
 	AddDependency(ctx context.Context, in *DependencyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	RemoveDependency(ctx context.Context, in *DependencyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	NodeDone(ctx context.Context, in *NodeDoneRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	PredictGraph(ctx context.Context, in *PredictGraphRequest, opts ...grpc.CallOption) (*PredictedGraphResponse, error)
 	TaskInNode(ctx context.Context, in *TaskInNodeRequest, opts ...grpc.CallOption) (*TaskInNodeResponse, error)
 }
@@ -136,15 +135,6 @@ func (c *graphsClient) RemoveDependency(ctx context.Context, in *DependencyReque
 	return out, nil
 }
 
-func (c *graphsClient) NodeDone(ctx context.Context, in *NodeDoneRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/graphs.Graphs/NodeDone", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *graphsClient) PredictGraph(ctx context.Context, in *PredictGraphRequest, opts ...grpc.CallOption) (*PredictedGraphResponse, error) {
 	out := new(PredictedGraphResponse)
 	err := c.cc.Invoke(ctx, "/graphs.Graphs/PredictGraph", in, out, opts...)
@@ -177,7 +167,6 @@ type GraphsServer interface {
 	GetDependencies(context.Context, *GetDependenciesRequest) (*NodeWithDependencies, error)
 	AddDependency(context.Context, *DependencyRequest) (*emptypb.Empty, error)
 	RemoveDependency(context.Context, *DependencyRequest) (*emptypb.Empty, error)
-	NodeDone(context.Context, *NodeDoneRequest) (*emptypb.Empty, error)
 	PredictGraph(context.Context, *PredictGraphRequest) (*PredictedGraphResponse, error)
 	TaskInNode(context.Context, *TaskInNodeRequest) (*TaskInNodeResponse, error)
 	mustEmbedUnimplementedGraphsServer()
@@ -216,9 +205,6 @@ func (UnimplementedGraphsServer) AddDependency(context.Context, *DependencyReque
 }
 func (UnimplementedGraphsServer) RemoveDependency(context.Context, *DependencyRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveDependency not implemented")
-}
-func (UnimplementedGraphsServer) NodeDone(context.Context, *NodeDoneRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeDone not implemented")
 }
 func (UnimplementedGraphsServer) PredictGraph(context.Context, *PredictGraphRequest) (*PredictedGraphResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PredictGraph not implemented")
@@ -419,24 +405,6 @@ func _Graphs_RemoveDependency_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Graphs_NodeDone_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeDoneRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GraphsServer).NodeDone(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/graphs.Graphs/NodeDone",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GraphsServer).NodeDone(ctx, req.(*NodeDoneRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Graphs_PredictGraph_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PredictGraphRequest)
 	if err := dec(in); err != nil {
@@ -519,10 +487,6 @@ var Graphs_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveDependency",
 			Handler:    _Graphs_RemoveDependency_Handler,
-		},
-		{
-			MethodName: "NodeDone",
-			Handler:    _Graphs_NodeDone_Handler,
 		},
 		{
 			MethodName: "PredictGraph",

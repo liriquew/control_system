@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/liriquew/control_system/internal/entities"
 	"github.com/liriquew/control_system/internal/models"
 	"github.com/liriquew/control_system/tests/suite"
 
@@ -57,7 +58,7 @@ func TestCreateTask(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		msg, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
-		assert.Equal(t, "invalid title", strings.TrimSpace(string(msg)))
+		assert.Equal(t, "empty title", strings.TrimSpace(string(msg)))
 	})
 
 	t.Run("Invalid Description", func(t *testing.T) {
@@ -79,7 +80,7 @@ func TestCreateTask(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		msg, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
-		assert.Equal(t, "invalid description", strings.TrimSpace(string(msg)))
+		assert.Equal(t, "empty description", strings.TrimSpace(string(msg)))
 	})
 }
 
@@ -138,7 +139,7 @@ func TestGetTask(t *testing.T) {
 		defer resp.Body.Close()
 
 		// Проверяем, что доступ запрещен
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 }
 
@@ -164,7 +165,7 @@ func TestGetTaskList(t *testing.T) {
 
 	// Успешное получение списка
 	t.Run("Success", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks?limit=3&offset=1", nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks?padding=2", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -261,7 +262,7 @@ func TestUpdateTask(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 		msg, _ := io.ReadAll(resp.Body)
-		assert.Equal(t, "nothing to update (empty fields)", strings.TrimSpace(string(msg)))
+		assert.Equal(t, "nothing to update", strings.TrimSpace(string(msg)))
 
 		notUpdatedTask := getTask(t, ts, token, taskID)
 
@@ -312,6 +313,44 @@ func TestDeleteTask(t *testing.T) {
 	})
 }
 
+func TestPredicTask(t *testing.T) {
+	ts := suite.New(t)
+
+	// Регистрируем пользователя
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	_, token := doSignUpFakeUser(t, ts, user)
+
+	// Создаем задачу
+	task := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: gofakeit.Float64(),
+	}
+	taskID := createTask(t, ts, token, task)
+
+	// Успешное удаление
+	t.Run("Success", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/"+strconv.FormatInt(taskID, 10)+"/predict", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var predictedTask entities.PredictedTask
+		json.NewDecoder(resp.Body).Decode(&predictedTask)
+		assert.Equal(t, task.Description, predictedTask.Task.Description)
+		assert.Equal(t, task.Title, predictedTask.Task.Title)
+		assert.Zero(t, predictedTask.PredictedTime)
+		assert.False(t, predictedTask.Predicted)
+	})
+}
+
 func createTask(t *testing.T, ts *suite.Suite, token string, task models.Task) int64 {
 	body, _ := json.Marshal(task)
 	req, _ := http.NewRequest("POST", ts.GetURL()+"/api/tasks", bytes.NewBuffer(body))
@@ -323,7 +362,6 @@ func createTask(t *testing.T, ts *suite.Suite, token string, task models.Task) i
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
 	var response struct {
 		ID json.Number `json:"id"`
 	}
@@ -361,7 +399,7 @@ func doSignUpFakeUser(t *testing.T, ts *suite.Suite, user models.User) (models.U
 	json.NewDecoder(resp.Body).Decode(&response)
 
 	tokenParsed, _ := jwt.Parse(response.Token, func(token *jwt.Token) (interface{}, error) {
-		return []byte("anyEps"), nil
+		return []byte("AnyEps"), nil
 	})
 
 	claims, _ := tokenParsed.Claims.(jwt.MapClaims)

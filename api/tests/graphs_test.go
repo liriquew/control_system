@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"testing"
@@ -17,11 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createGraph(t *testing.T, ts *suite.Suite, token string, graph entities.GraphWithNodes) int64 {
+func createGraph(t *testing.T, ts *suite.Suite, token string, groupID int64, graph entities.GraphWithNodes) int64 {
 	body, err := json.Marshal(graph)
 	require.NoError(t, err)
 
-	req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(graph.GraphInfo.GroupID, 10)+"/graphs", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(groupID, 10)+"/graphs", bytes.NewBuffer(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -31,38 +32,18 @@ func createGraph(t *testing.T, ts *suite.Suite, token string, graph entities.Gra
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	// msg, _ := io.ReadAll(resp.Body)
+	// fmt.Println(string(msg))
 
-	var createdGraph models.Graph
-	err = json.NewDecoder(resp.Body).Decode(&createdGraph)
-	require.NoError(t, err)
-
-	return createdGraph.ID
+	id := getID(t, resp)
+	return id
 }
 
-func getGraph(t *testing.T, ts *suite.Suite, token string, graphID int64) entities.GraphWithNodes {
-	req, err := http.NewRequest("POST", ts.GetURL()+"/api/grahs/"+strconv.FormatInt(graphID, 10), bytes.NewBuffer([]byte{}))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	var createdGraph entities.GraphWithNodes
-	err = json.NewDecoder(resp.Body).Decode(&createdGraph)
-	require.NoError(t, err)
-
-	return createdGraph
-}
-
-func createNode(t *testing.T, ts *suite.Suite, token string, graphID int64, node models.Node) int64 {
+func createNode(t *testing.T, ts *suite.Suite, token string, groupID, graphID int64, node models.Node) int64 {
 	body, err := json.Marshal(node)
 	require.NoError(t, err)
 
-	req, err := http.NewRequest("POST", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(groupID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes", bytes.NewBuffer(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -72,12 +53,10 @@ func createNode(t *testing.T, ts *suite.Suite, token string, graphID int64, node
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	id := getID(t, resp)
 
-	var createdNode models.Node
-	err = json.NewDecoder(resp.Body).Decode(&createdNode)
-	require.NoError(t, err)
-
-	return createdNode.ID
+	assert.NotZero(t, id)
+	return id
 }
 
 func createDependency(t *testing.T, ts *suite.Suite, token string, graphID, node1ID, node2ID int64) {
@@ -91,7 +70,82 @@ func createDependency(t *testing.T, ts *suite.Suite, token string, graphID, node
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
 
+func TestCreateAndListGroupGraphs(t *testing.T) {
+	ts := suite.New(t)
+
+	// Регистрируем пользователя
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: gofakeit.Password(true, true, true, true, false, 10),
+	}
+	_, token := doSignUpFakeUser(t, ts, user)
+
+	// Создаем группу
+	group := models.Group{
+		Name:        gofakeit.Company(),
+		Description: gofakeit.Sentence(10),
+	}
+	groupID := createGroup(t, ts, token, group)
+
+	task1 := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: gofakeit.Float64(),
+	}
+
+	task1.ID = createGroupTask(t, ts, token, groupID, task1)
+
+	task2 := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: gofakeit.Float64(),
+	}
+
+	task2.ID = createGroupTask(t, ts, token, groupID, task2)
+
+	// Создаем граф
+	graph := entities.GraphWithNodes{
+		GraphInfo: &models.Graph{
+			Name: gofakeit.BeerName(),
+		},
+		Nodes: []*models.Node{
+			{ID: 1, DependencyNodeIDs: []int64{2}, TaskID: task1.ID},
+			{ID: 2, TaskID: task2.ID},
+		},
+	}
+	body, _ := json.Marshal(graph)
+
+	req, _ := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(groupID, 10)+"/graphs", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	graphID := getID(t, resp)
+	assert.NotZero(t, graphID)
+
+	// Получаем список графов
+	req, _ = http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(groupID, 10)+"/graphs", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var graphs []entities.GraphWithNodes
+	err = json.NewDecoder(resp.Body).Decode(&graphs)
+
+	require.NoError(t, err)
+
+	assert.Len(t, graphs, 1)
 }
 
 func TestGetGraph(t *testing.T) {
@@ -116,31 +170,30 @@ func TestGetGraph(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1.ID = createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2.ID = createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
 	// Создаем группу
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
-			Name:    gofakeit.BeerName(),
-			GroupID: group.ID,
+		GraphInfo: &models.Graph{
+			Name: gofakeit.BeerName(),
 		},
 		Nodes: []*models.Node{
 			{ID: 1, DependencyNodeIDs: []int64{2}, TaskID: task1.ID},
 			{ID: 2, TaskID: task2.ID},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graphID := createGraph(t, ts, token, group.ID, graph)
 
 	t.Run("Success", func(t *testing.T) {
 		// Получаем граф
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10), nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -164,14 +217,14 @@ func TestGetGraph(t *testing.T) {
 
 		for _, node := range retrievedGraph.Nodes {
 			_, ok := tasksNodeMap[node.TaskID]
-			assert.True(t, true, ok)
+			assert.True(t, ok)
 			tasksNodeMap[node.TaskID] = node.ID
 			if len(node.DependencyNodeIDs) != 0 {
-				assert.False(t, false, nodeWithDepFound)
+				assert.False(t, nodeWithDepFound)
 				nodeWithDep = node
 				nodeWithDepFound = true
 			} else {
-				assert.False(t, false, depFound)
+				assert.False(t, depFound)
 				depNode = node
 				depFound = true
 			}
@@ -190,7 +243,7 @@ func TestGetGraph(t *testing.T) {
 			Password: getSomePassword(),
 		}
 		_, token := doSignUpFakeUser(t, ts, user)
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10), nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -223,44 +276,44 @@ func TestCreateNode(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1.ID = createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2.ID = createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
 	// Создаем группу
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
-			Name:    gofakeit.BeerName(),
-			GroupID: group.ID,
+		GraphInfo: &models.Graph{
+			Name: gofakeit.BeerName(),
 		},
 		Nodes: []*models.Node{
 			{ID: 1, DependencyNodeIDs: []int64{2}, TaskID: task1.ID},
 			{ID: 2, TaskID: task2.ID},
 		},
 	}
-	graph.GraphInfo.ID = createGraph(t, ts, token, graph)
+	graph.GraphInfo.ID = createGraph(t, ts, token, group.ID, graph)
 
 	newTask1 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	newTask1.ID = createTask(t, ts, token, newTask1)
+	newTask1.ID = createGroupTask(t, ts, token, group.ID, newTask1)
 
 	node := models.Node{
 		GraphID:           graph.GraphInfo.ID,
 		TaskID:            newTask1.ID,
 		DependencyNodeIDs: []int64{},
 	}
+
 	t.Run("Success", func(t *testing.T) {
 		body, _ := json.Marshal(node)
 
-		req, _ := http.NewRequest("POST", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graph.GraphInfo.ID, 10)+"/nodes", bytes.NewBuffer(body))
+		req, _ := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graph.GraphInfo.ID, 10)+"/nodes", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -270,11 +323,9 @@ func TestCreateNode(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		var createdNode models.Node
-		err = json.NewDecoder(resp.Body).Decode(&createdNode)
-		require.NoError(t, err)
+		id := getID(t, resp)
 
-		assert.NotZero(t, createdNode.ID)
+		assert.NotZero(t, id)
 	})
 
 	t.Run("Forbidden", func(t *testing.T) {
@@ -286,7 +337,7 @@ func TestCreateNode(t *testing.T) {
 		_, token := doSignUpFakeUser(t, ts, user)
 		body, _ := json.Marshal(node)
 
-		req, _ := http.NewRequest("POST", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graph.GraphInfo.ID, 10)+"/nodes", bytes.NewBuffer(body))
+		req, _ := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graph.GraphInfo.ID, 10)+"/nodes", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -320,18 +371,17 @@ func TestRemoveNode(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1.ID = createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2.ID = createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
-	// Создаем группу
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
+		GraphInfo: &models.Graph{
 			Name:    gofakeit.BeerName(),
 			GroupID: group.ID,
 		},
@@ -340,14 +390,14 @@ func TestRemoveNode(t *testing.T) {
 			{ID: 2, TaskID: task2.ID},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graphID := createGraph(t, ts, token, group.ID, graph)
 
 	task3 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task3.ID = createTask(t, ts, token, task3)
+	task3.ID = createGroupTask(t, ts, token, group.ID, task3)
 
 	// Создаем узел
 	node := models.Node{
@@ -355,10 +405,10 @@ func TestRemoveNode(t *testing.T) {
 		TaskID:            task3.ID,
 		DependencyNodeIDs: []int64{},
 	}
-	nodeID := createNode(t, ts, token, graphID, node)
+	nodeID := createNode(t, ts, token, group.ID, graphID, node)
 	t.Run("Success", func(t *testing.T) {
 		// Удаляем узел
-		req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
+		req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -368,7 +418,7 @@ func TestRemoveNode(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Проверяем, что узел удален
-		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
+		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err = http.DefaultClient.Do(req)
@@ -385,7 +435,7 @@ func TestRemoveNode(t *testing.T) {
 		}
 		_, token := doSignUpFakeUser(t, ts, user)
 		// Удаляем узел
-		req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
+		req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -393,8 +443,7 @@ func TestRemoveNode(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		// Проверяем, что узел удален
-		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
+		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err = http.DefaultClient.Do(req)
@@ -427,18 +476,18 @@ func TestUpdateNode(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1.ID = createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2.ID = createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
 	// Создаем группу
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
+		GraphInfo: &models.Graph{
 			Name:    gofakeit.BeerName(),
 			GroupID: group.ID,
 		},
@@ -447,28 +496,28 @@ func TestUpdateNode(t *testing.T) {
 			{ID: 2, TaskID: task2.ID},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graphID := createGraph(t, ts, token, group.ID, graph)
 
 	task3 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task3.ID = createTask(t, ts, token, task3)
+	task3.ID = createGroupTask(t, ts, token, group.ID, task3)
 	// Создаем узел
 	node := models.Node{
 		GraphID:           graphID,
 		DependencyNodeIDs: []int64{},
 		TaskID:            task3.ID,
 	}
-	nodeID := createNode(t, ts, token, graphID, node)
+	nodeID := createNode(t, ts, token, group.ID, graphID, node)
 
 	task4 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task4.ID = createTask(t, ts, token, task4)
+	task4.ID = createGroupTask(t, ts, token, group.ID, task4)
 
 	// Обновляем узел
 	updatedNode := models.Node{
@@ -477,7 +526,7 @@ func TestUpdateNode(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		body, _ := json.Marshal(updatedNode)
 
-		req, _ := http.NewRequest("PATCH", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), bytes.NewBuffer(body))
+		req, _ := http.NewRequest("PATCH", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -488,7 +537,7 @@ func TestUpdateNode(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Проверяем, что узел обновлен
-		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
+		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err = http.DefaultClient.Do(req)
@@ -509,7 +558,7 @@ func TestUpdateNode(t *testing.T) {
 		_, token := doSignUpFakeUser(t, ts, user)
 		body, _ := json.Marshal(updatedNode)
 
-		req, _ := http.NewRequest("PATCH", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), bytes.NewBuffer(body))
+		req, _ := http.NewRequest("PATCH", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(nodeID, 10), bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -536,7 +585,7 @@ func TestGetDependencies(t *testing.T) {
 		Name:        gofakeit.Company(),
 		Description: gofakeit.Sentence(10),
 	}
-	groupID := createGroup(t, ts, token, group)
+	group.ID = createGroup(t, ts, token, group)
 
 	// Создаем задачи
 	task1 := models.Task{
@@ -544,20 +593,19 @@ func TestGetDependencies(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1ID := createTask(t, ts, token, task1)
+	task1ID := createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2ID := createTask(t, ts, token, task2)
+	task2ID := createGroupTask(t, ts, token, group.ID, task2)
 
 	// Создаем граф
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
-			Name:    gofakeit.BeerName(),
-			GroupID: groupID,
+		GraphInfo: &models.Graph{
+			Name: gofakeit.BeerName(),
 		},
 		Nodes: []*models.Node{
 			{
@@ -567,24 +615,31 @@ func TestGetDependencies(t *testing.T) {
 			},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graphID := createGraph(t, ts, token, group.ID, graph)
 
 	t.Run("Success Creator", func(t *testing.T) {
 		proxyNode := models.Node{
 			GraphID: graphID,
 			TaskID:  task2ID,
 		}
-		proxyNode.ID = createNode(t, ts, token, graphID, proxyNode)
+		proxyNode.ID = createNode(t, ts, token, group.ID, graphID, proxyNode)
+
+		task3 := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: gofakeit.Float64(),
+		}
+		task3ID := createGroupTask(t, ts, token, group.ID, task3)
 
 		createdNode := models.Node{
 			GraphID:           graphID,
-			TaskID:            task2ID,
+			TaskID:            task3ID,
 			DependencyNodeIDs: []int64{proxyNode.ID},
 		}
-		createdNode.ID = createNode(t, ts, token, graphID, createdNode)
+		createdNode.ID = createNode(t, ts, token, group.ID, graphID, createdNode)
 
 		// Получаем зависимости для узла 2
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(createdNode.ID, 10)+"/dependencies", nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(createdNode.ID, 10)+"/dependencies", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -603,18 +658,31 @@ func TestGetDependencies(t *testing.T) {
 	})
 
 	t.Run("Forbidden", func(t *testing.T) {
+		task4 := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: gofakeit.Float64(),
+		}
+		task4ID := createGroupTask(t, ts, token, group.ID, task4)
+		task5 := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: gofakeit.Float64(),
+		}
+		task5ID := createGroupTask(t, ts, token, group.ID, task5)
+
 		proxyNode := models.Node{
 			GraphID: graphID,
-			TaskID:  task2ID,
+			TaskID:  task4ID,
 		}
-		proxyNode.ID = createNode(t, ts, token, graphID, proxyNode)
+		proxyNode.ID = createNode(t, ts, token, group.ID, graphID, proxyNode)
 
 		createdNode := models.Node{
 			GraphID:           graphID,
-			TaskID:            task2ID,
+			TaskID:            task5ID,
 			DependencyNodeIDs: []int64{proxyNode.ID},
 		}
-		createdNode.ID = createNode(t, ts, token, graphID, createdNode)
+		createdNode.ID = createNode(t, ts, token, group.ID, graphID, createdNode)
 		// Регистрируем пользователя
 		user := models.User{
 			Username: gofakeit.Username(),
@@ -622,7 +690,7 @@ func TestGetDependencies(t *testing.T) {
 		}
 		_, token := doSignUpFakeUser(t, ts, user)
 		// Получаем зависимости для узла 2
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(createdNode.ID, 10)+"/dependencies", nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/nodes/%d/dependencies", group.ID, graphID, createdNode.ID), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -641,7 +709,7 @@ func TestGetDependencies(t *testing.T) {
 		_, tokenEditor := doSignUpFakeUser(t, ts, userEditor)
 
 		tokenParsed, err := jwt.Parse(tokenEditor, func(token *jwt.Token) (interface{}, error) {
-			return []byte("anyEps"), nil
+			return []byte("AnyEps"), nil
 		})
 
 		require.NoError(t, err)
@@ -659,7 +727,7 @@ func TestGetDependencies(t *testing.T) {
 		body, err := json.Marshal(gm)
 		assert.NoError(ts, err)
 
-		req, _ := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(groupID, 10)+"/members", bytes.NewBuffer(body))
+		req, _ := http.NewRequest("POST", ts.GetURL()+fmt.Sprintf("/api/groups/%d/members", group.ID), bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -669,21 +737,34 @@ func TestGetDependencies(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+		task4 := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: gofakeit.Float64(),
+		}
+		task4ID := createGroupTask(t, ts, token, group.ID, task4)
+		task5 := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: gofakeit.Float64(),
+		}
+		task5ID := createGroupTask(t, ts, token, group.ID, task5)
+
 		proxyNode := models.Node{
 			GraphID: graphID,
-			TaskID:  task2ID,
+			TaskID:  task4ID,
 		}
-		proxyNode.ID = createNode(t, ts, tokenEditor, graphID, proxyNode)
+		proxyNode.ID = createNode(t, ts, tokenEditor, group.ID, graphID, proxyNode)
 
 		createdNode := models.Node{
 			GraphID:           graphID,
-			TaskID:            task2ID,
+			TaskID:            task5ID,
 			DependencyNodeIDs: []int64{proxyNode.ID},
 		}
-		createdNode.ID = createNode(t, ts, tokenEditor, graphID, createdNode)
+		createdNode.ID = createNode(t, ts, tokenEditor, group.ID, graphID, createdNode)
 
 		// Получаем зависимости для узла 2
-		req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(createdNode.ID, 10)+"/dependencies", nil)
+		req, _ = http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/nodes/%d/dependencies", group.ID, graphID, createdNode.ID), nil)
 		req.Header.Set("Authorization", "Bearer "+tokenEditor)
 
 		resp, err = http.DefaultClient.Do(req)
@@ -724,18 +805,18 @@ func TestAddDependency(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1.ID = createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2.ID = createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
 	// Создаем группу
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
+		GraphInfo: &models.Graph{
 			Name:    gofakeit.BeerName(),
 			GroupID: group.ID,
 		},
@@ -744,21 +825,21 @@ func TestAddDependency(t *testing.T) {
 			{ID: 2, TaskID: task2.ID},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graphID := createGraph(t, ts, token, group.ID, graph)
 
 	task3 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task3.ID = createTask(t, ts, token, task3)
+	task3.ID = createGroupTask(t, ts, token, group.ID, task3)
 
 	task4 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task4.ID = createTask(t, ts, token, task4)
+	task4.ID = createGroupTask(t, ts, token, group.ID, task4)
 
 	// Создаем два узла
 	node1 := models.Node{
@@ -766,16 +847,16 @@ func TestAddDependency(t *testing.T) {
 		DependencyNodeIDs: []int64{},
 		TaskID:            task3.ID,
 	}
-	node1ID := createNode(t, ts, token, graphID, node1)
+	node1ID := createNode(t, ts, token, group.ID, graphID, node1)
 
 	node2 := models.Node{
 		GraphID:           graphID,
 		DependencyNodeIDs: []int64{},
 		TaskID:            task4.ID,
 	}
-	node2ID := createNode(t, ts, token, graphID, node2)
+	node2ID := createNode(t, ts, token, group.ID, graphID, node2)
 
-	req, _ := http.NewRequest("POST", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node1ID, 10)+"/dependencies/"+strconv.FormatInt(node2ID, 10), bytes.NewBuffer([]byte{}))
+	req, _ := http.NewRequest("POST", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/nodes/%d/dependencies/%d", group.ID, graphID, node1ID, node2ID), bytes.NewBuffer([]byte{}))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -786,7 +867,7 @@ func TestAddDependency(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Проверяем, что зависимость добавлена
-	req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node1ID, 10)+"/dependencies", nil)
+	req, _ = http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/nodes/%d/dependencies", group.ID, graphID, node1ID), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err = http.DefaultClient.Do(req)
@@ -823,18 +904,18 @@ func TestRemoveDependency(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task1.ID = createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task2.ID = createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
 	// Создаем группу
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
+		GraphInfo: &models.Graph{
 			Name:    gofakeit.BeerName(),
 			GroupID: group.ID,
 		},
@@ -843,37 +924,37 @@ func TestRemoveDependency(t *testing.T) {
 			{ID: 2, TaskID: task2.ID},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graphID := createGraph(t, ts, token, group.ID, graph)
 
 	task3 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task3.ID = createTask(t, ts, token, task3)
+	task3.ID = createGroupTask(t, ts, token, group.ID, task3)
 	// Создаем два узла
 	node1 := models.Node{
 		GraphID:           graphID,
 		DependencyNodeIDs: []int64{},
 		TaskID:            task3.ID,
 	}
-	node1ID := createNode(t, ts, token, graphID, node1)
+	node1ID := createNode(t, ts, token, group.ID, graphID, node1)
 
 	task4 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-	task4.ID = createTask(t, ts, token, task4)
+	task4.ID = createGroupTask(t, ts, token, group.ID, task4)
 	node2 := models.Node{
 		GraphID:           graphID,
 		DependencyNodeIDs: []int64{node1ID},
 		TaskID:            task4.ID,
 	}
-	node2ID := createNode(t, ts, token, graphID, node2)
+	node2ID := createNode(t, ts, token, group.ID, graphID, node2)
 
 	// Удаляем зависимость
-	req, _ := http.NewRequest("DELETE", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node2ID, 10)+"/dependencies/"+strconv.FormatInt(node1ID, 10), nil)
+	req, _ := http.NewRequest("DELETE", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/nodes/%d/dependencies/%d", group.ID, graphID, node2ID, node1ID), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -883,7 +964,7 @@ func TestRemoveDependency(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Проверяем, что зависимость удалена
-	req, _ = http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/nodes/"+strconv.FormatInt(node2ID, 10)+"/dependencies", nil)
+	req, _ = http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/nodes/%d/dependencies", group.ID, graphID, node2ID), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err = http.DefaultClient.Do(req)
@@ -922,64 +1003,139 @@ func TestPredictGraph(t *testing.T) {
 		Name:        gofakeit.Company(),
 		Description: gofakeit.Sentence(10),
 	}
-	groupID := createGroup(t, ts, token, group)
+	group.ID = createGroup(t, ts, token, group)
+
+	addGroupMember(t, ts, token, group.ID, models.GroupMember{
+		UserID: user1.ID,
+		Role:   "member",
+	})
+	addGroupMember(t, ts, token, group.ID, models.GroupMember{
+		UserID: user2.ID,
+		Role:   "member",
+	})
 
 	task1 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
-		PlannedTime: gofakeit.Float64(),
-		UserID:      user1.ID,
+		PlannedTime: 1.123,
+		AssignedTo:  user1.ID,
 	}
-	task1ID := createTask(t, ts, token, task1)
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
 
 	task2 := models.Task{
 		Title:       gofakeit.JobTitle(),
 		Description: gofakeit.JobDescriptor(),
-		PlannedTime: gofakeit.Float64(),
-		UserID:      user2.ID,
+		PlannedTime: 1.123,
+		AssignedTo:  user2.ID,
 	}
-	task2ID := createTask(t, ts, token, task2)
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
 
 	graph := entities.GraphWithNodes{
-		GraphInfo: models.Graph{
-			Name:    gofakeit.BeerName(),
-			GroupID: groupID,
+		GraphInfo: &models.Graph{
+			Name: gofakeit.BeerName(),
 		},
 		Nodes: []*models.Node{
 			{
 				ID:                1,
-				TaskID:            task1ID,
+				TaskID:            task1.ID,
 				DependencyNodeIDs: []int64{},
-				AssignedTo:        &user1.ID,
 			},
 			{
 				ID:                2,
-				TaskID:            task2ID,
+				TaskID:            task2.ID,
 				DependencyNodeIDs: []int64{1},
-				AssignedTo:        &user2.ID,
 			},
 		},
 	}
-	graphID := createGraph(t, ts, token, graph)
+	graph.GraphInfo.ID = createGraph(t, ts, token, group.ID, graph)
 
-	// Тестируем успешный сценарий
-	t.Run("Success", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/predict", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
+	req, _ := http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/predict", group.ID, graph.GraphInfo.ID), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		var predictedGraph entities.PredictedGraph
-		err = json.NewDecoder(resp.Body).Decode(&predictedGraph)
-		require.NoError(t, err)
+	var predictedGraph entities.PredictedGraph
+	err = json.NewDecoder(resp.Body).Decode(&predictedGraph)
+	require.NoError(t, err)
 
-		assert.NotNil(t, predictedGraph.Graph)
-		assert.NotEmpty(t, predictedGraph.Paths)
+	assert.NotNil(t, predictedGraph.Graph)
+	assert.NotEmpty(t, predictedGraph.Paths)
+}
+
+func TestPredictGraph_BadCase(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	_, token := doSignUpFakeUser(t, ts, user)
+
+	user1 := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user1, _ = doSignUpFakeUser(t, ts, user1)
+
+	user2 := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user2, _ = doSignUpFakeUser(t, ts, user2)
+
+	group := models.Group{
+		Name:        gofakeit.Company(),
+		Description: gofakeit.Sentence(10),
+	}
+	group.ID = createGroup(t, ts, token, group)
+
+	addGroupMember(t, ts, token, group.ID, models.GroupMember{
+		UserID: user1.ID,
+		Role:   "member",
 	})
+	addGroupMember(t, ts, token, group.ID, models.GroupMember{
+		UserID: user2.ID,
+		Role:   "member",
+	})
+
+	task1 := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: 1.123,
+		AssignedTo:  user1.ID,
+	}
+	task1.ID = createGroupTask(t, ts, token, group.ID, task1)
+
+	task2 := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: 1.123,
+		AssignedTo:  user2.ID,
+	}
+	task2.ID = createGroupTask(t, ts, token, group.ID, task2)
+
+	graph := entities.GraphWithNodes{
+		GraphInfo: &models.Graph{
+			Name: gofakeit.BeerName(),
+		},
+		Nodes: []*models.Node{
+			{
+				ID:                1,
+				TaskID:            task1.ID,
+				DependencyNodeIDs: []int64{},
+			},
+			{
+				ID:                2,
+				TaskID:            task2.ID,
+				DependencyNodeIDs: []int64{1},
+			},
+		},
+	}
+	graph.GraphInfo.ID = createGraph(t, ts, token, group.ID, graph)
 
 	// Тестируем ошибку доступа
 	t.Run("Access denied", func(t *testing.T) {
@@ -990,7 +1146,7 @@ func TestPredictGraph(t *testing.T) {
 		}
 		_, otherToken := doSignUpFakeUser(t, ts, otherUser)
 
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/"+strconv.FormatInt(graphID, 10)+"/predict", nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/%d/predict", group.ID, graph.GraphInfo.ID), nil)
 		req.Header.Set("Authorization", "Bearer "+otherToken)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -1002,43 +1158,39 @@ func TestPredictGraph(t *testing.T) {
 
 	// Тестируем ошибку "граф не найден"
 	t.Run("Graph not found", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/graphs/999999/predict", nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+fmt.Sprintf("/api/groups/%d/graphs/999999/predict", group.ID), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 
 	// Тестируем ошибку "цикл в графе"
 	t.Run("Cycle in graph", func(t *testing.T) {
-		// Создаем граф с циклом
 		cyclicGraph := entities.GraphWithNodes{
-			GraphInfo: models.Graph{
-				Name:    gofakeit.BeerName(),
-				GroupID: groupID,
+			GraphInfo: &models.Graph{
+				Name: gofakeit.BeerName(),
 			},
 			Nodes: []*models.Node{
 				{
 					ID:                1,
-					TaskID:            task1ID,
+					TaskID:            task1.ID,
 					DependencyNodeIDs: []int64{2},
-					AssignedTo:        &user1.ID,
 				},
 				{
 					ID:                2,
-					TaskID:            task2ID,
+					TaskID:            task2.ID,
 					DependencyNodeIDs: []int64{1},
-					AssignedTo:        &user1.ID,
 				},
 			},
 		}
 		body, err := json.Marshal(cyclicGraph)
 		require.NoError(t, err)
 
-		req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(graph.GraphInfo.GroupID, 10)+"/graphs", bytes.NewBuffer(body))
+		req, err := http.NewRequest("POST", ts.GetURL()+"/api/groups/"+strconv.FormatInt(group.ID, 10)+"/graphs", bytes.NewBuffer(body))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")

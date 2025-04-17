@@ -13,6 +13,7 @@ type Graph struct {
 }
 
 type Dependency struct {
+	GraphID    int64
 	FromNodeID int64 `json:"from_node_id" db:"from_node_id"`
 	ToNodeID   int64 `json:"to_node_id" db:"to_node_id"`
 }
@@ -21,7 +22,6 @@ type Node struct {
 	ID                int64   `json:"id" db:"id"`
 	GraphID           int64   `json:"graph_id" db:"graph_id"`
 	TaskID            int64   `json:"task_id" db:"task_id"`
-	AssignedTo        *int64  `json:"assigned_to" db:"assigned_to"`
 	DependencyNodeIDs []int64 `json:"dependencies"`
 }
 

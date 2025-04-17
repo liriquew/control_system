@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/liriquew/tasks_service/internal/lib/config"
 	"github.com/liriquew/tasks_service/internal/models"
@@ -20,14 +21,24 @@ type ProducerWrapper struct {
 
 func NewProducer(log *slog.Logger, cfg config.KafkaTasksTopicConfig) (*ProducerWrapper, error) {
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:  []string{cfg.ConnStr},
-		Topic:    cfg.Topic,
-		Balancer: &kafka.LeastBytes{},
+		Brokers:       []string{cfg.ConnStr},
+		Topic:         cfg.Topic,
+		Balancer:      &kafka.LeastBytes{},
+		RequiredAcks:  1,
+		BatchSize:     1000,                   // Увеличить размер батча
+		BatchTimeout:  100 * time.Millisecond, // Чаще отправлять батчи
+		QueueCapacity: 10000,                  // Увеличить размер очереди
+		MaxAttempts:   2,                      // Уменьшить число попыток
 	})
 	deleteWriter := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:  []string{cfg.ConnStr},
-		Topic:    cfg.DeleteTopic,
-		Balancer: &kafka.LeastBytes{},
+		Brokers:       []string{cfg.ConnStr},
+		Topic:         cfg.DeleteTopic,
+		Balancer:      &kafka.LeastBytes{},
+		RequiredAcks:  1,
+		BatchSize:     1000,                   // Увеличить размер батча
+		BatchTimeout:  100 * time.Millisecond, // Чаще отправлять батчи
+		QueueCapacity: 10000,                  // Увеличить размер очереди
+		MaxAttempts:   2,                      // Уменьшить число попыток
 	})
 
 	return &ProducerWrapper{

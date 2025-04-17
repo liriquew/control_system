@@ -19,13 +19,13 @@ var (
 	ErrUserExists = errors.New("user already exists")
 )
 
-type TaskRepository struct {
+type Repository struct {
 	db *sqlx.DB
 }
 
 const listTasksBatchSize = 10
 
-func NewAuthRepository(cfg config.StorageConfig) (*TaskRepository, error) {
+func NewAuthRepository(cfg config.StorageConfig) (*Repository, error) {
 	const op = "storage.postgres.New"
 
 	connStr := fmt.Sprintf("postgres://%s:%s@localhost:%d/%s?sslmode=disable",
@@ -45,16 +45,16 @@ func NewAuthRepository(cfg config.StorageConfig) (*TaskRepository, error) {
 	}
 
 	fmt.Println("DB CONNECT OK")
-	return &TaskRepository{
+	return &Repository{
 		db: db,
 	}, nil
 }
 
-func (s *TaskRepository) Close() error {
+func (s *Repository) Close() error {
 	return s.db.Close()
 }
 
-func (s *TaskRepository) SaveUser(ctx context.Context, username string, passHash []byte) (int64, error) {
+func (s *Repository) SaveUser(ctx context.Context, username string, passHash []byte) (int64, error) {
 	const op = "storage.postgres.SaveUser"
 
 	var userID int64
@@ -71,7 +71,7 @@ func (s *TaskRepository) SaveUser(ctx context.Context, username string, passHash
 	return userID, nil
 }
 
-func (s *TaskRepository) GetUser(ctx context.Context, username string) (*models.User, error) {
+func (s *Repository) GetUser(ctx context.Context, username string) (*models.User, error) {
 	const op = "storage.postgres.User"
 
 	stmt, err := s.db.Prepare("SELECT id, username, password_hash FROM users WHERE username = $1")
@@ -92,4 +92,19 @@ func (s *TaskRepository) GetUser(ctx context.Context, username string) (*models.
 	}
 
 	return &user, nil
+}
+
+func (s *Repository) GetUsersDetails(ctx context.Context, userIDs []int64) ([]*models.User, error) {
+	query := "SELECT id, username FROM users WHERE id = ANY($1)"
+
+	var res []*models.User
+	if err := s.db.SelectContext(ctx, &res, query, pq.Array(userIDs)); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return res, nil
 }

@@ -1,12 +1,28 @@
-postgres:
-  username: postgres
-  password: passw0rd
+api_gateway:
+  port: 8080
+  host: 127.0.0.1
+auth_service:
   host: localhost
-  port: 5432
-  db_name: control_system
+  port: 50051
+  timeout: 1s
+  retries: 1
 predictions_service:
   host: localhost
-  port: 4041
-api_service:
-  host: 127.0.0.1
-  port: 8080
+  port: 50052
+  timeout: 1s
+  retries: 1
+groups_service:
+  host: localhost
+  port: 50053
+  timeout: 1s
+  retries: 1
+tasks_service:
+  host: localhost
+  port: 50054
+  timeout: 1s
+  retries: 1
+graphs_service:
+  host: localhost
+  port: 50055
+  timeout: 1s
+  retries: 1

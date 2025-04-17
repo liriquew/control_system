@@ -150,6 +150,7 @@ class Database():
         finally:
             cursor.close()
 
+
     def delete_task_prediction_data(self, task_id: int):
         try:
             cursor = self.conn.cursor()

@@ -19,6 +19,7 @@ import (
 type tasksRepository interface {
 	SaveUser(ctx context.Context, username string, password []byte) (int64, error)
 	GetUser(ctx context.Context, username string) (*models.User, error)
+	GetUsersDetails(ctx context.Context, userIDs []int64) ([]*models.User, error)
 }
 
 type serverAPI struct {
@@ -107,5 +108,30 @@ func (s *serverAPI) Authenticate(ctx context.Context, JWTToken *auth_pb.JWT) (*a
 
 	return &auth_pb.UserID{
 		ID: userID,
+	}, nil
+}
+
+func (s *serverAPI) GetUsersDetails(ctx context.Context, userIDs *auth_pb.UserIDs) (*auth_pb.ListUserDetails, error) {
+	users, err := s.repository.GetUsersDetails(ctx, userIDs.UserIDs)
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		s.log.Error("error while getting list of user details", sl.Err(err))
+		return nil, status.Error(codes.Internal, "internal")
+	}
+
+	if len(userIDs.UserIDs) != len(users) {
+		userIDsSet := make(map[int64]struct{}, len(userIDs.UserIDs))
+		for _, user := range users {
+			userIDsSet[user.UID] = struct{}{}
+		}
+
+		for _, uid := range userIDs.UserIDs {
+			if _, ok := userIDsSet[uid]; !ok {
+				s.log.Error("some user not found, but requested by another service:", slog.Int64("userID", uid))
+			}
+		}
+	}
+
+	return &auth_pb.ListUserDetails{
+		Users: models.ConvertUsersToProto(users),
 	}, nil
 }

@@ -18,7 +18,6 @@ service Graphs {
     rpc GetDependencies(GetDependenciesRequest) returns (NodeWithDependencies);
     rpc AddDependency(DependencyRequest) returns (google.protobuf.Empty);
     rpc RemoveDependency(DependencyRequest) returns (google.protobuf.Empty);
-    rpc NodeDone(NodeDoneRequest) returns (google.protobuf.Empty);
     rpc PredictGraph(PredictGraphRequest) returns (PredictedGraphResponse);
 
     rpc TaskInNode(TaskInNodeRequest) returns (TaskInNodeResponse);
@@ -59,6 +58,7 @@ message GraphResponse {
 }
 
 message ListGroupGraphsRequest {
+    int64 Padding = 1;
     int64 GroupID = 2;
 }
 

@@ -8,14 +8,14 @@ import predictions_service.predictions_service_pb2_grpc as pb2_grpc
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.internal import containers as _containers
 
-from predictions import Predicator, PredicatorException
+from service import PredictionService, PredicatorException
 from config import ConfigLoader
 from database import Database
 from consumer import KafkaMLConsumer
 
-class PredictService(pb2_grpc.PredictionsServicer):
+class PredictionsServer(pb2_grpc.PredictionsServicer):
     def __init__(self, config: Dict[str, Any]):
-        self.service = Predicator(config)
+        self.service = PredictionService(config)
 
 
     def _handle_exception(self, context: grpc.ServicerContext, exception: Exception):
@@ -57,7 +57,7 @@ def serve():
     consumer = KafkaMLConsumer(app_config.get_kafka_config(), db)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    pb2_grpc.add_PredictionsServicer_to_server(PredictService(db), server)
+    pb2_grpc.add_PredictionsServicer_to_server(PredictionsServer(db), server)
     
     conn_str = f"{service_config["host"]}:{service_config["port"]}"
     server.add_insecure_port(conn_str)

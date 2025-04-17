@@ -142,10 +142,7 @@ func (s *TaskRepository) GetTaskList(ctx context.Context, userID, padding int64)
 	`
 	var tasks []*models.Task
 	err := s.db.SelectContext(ctx, &tasks, query, userID, padding, listTasksBatchSize)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
@@ -158,6 +155,49 @@ func (s *TaskRepository) UpdateTask(ctx context.Context, task *tsks_pb.Task) err
 	var fields []string
 	args := []any{task.CreatedBy, task.ID}
 	argPos := 2
+
+	if task.ActualTime != 0 {
+		argPos++
+		fields = append(fields, fmt.Sprintf("actual_time=$%d", argPos))
+		args = append(args, task.ActualTime)
+	}
+	if task.PlannedTime != 0 {
+		argPos++
+		fields = append(fields, fmt.Sprintf("planned_time=$%d", argPos))
+		args = append(args, task.PlannedTime)
+	}
+	if task.Description != "" {
+		argPos++
+		fields = append(fields, fmt.Sprintf("description=$%d", argPos))
+		args = append(args, task.Description)
+	}
+	if task.Title != "" {
+		argPos++
+		fields = append(fields, fmt.Sprintf("title=$%d", argPos))
+		args = append(args, task.Title)
+	}
+
+	query = fmt.Sprintf(query, strings.Join(fields, ", "))
+
+	if len(fields) != 0 {
+		err := s.db.QueryRowContext(ctx, query, args...).Scan(&task.ID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *TaskRepository) UpdateGroupTask(ctx context.Context, task *tsks_pb.Task) error {
+	query := "UPDATE tasks SET %s WHERE id=$1 RETURNING id"
+
+	var fields []string
+	args := []any{task.ID}
+	argPos := 1
 
 	if task.ActualTime != 0 {
 		argPos++
@@ -220,12 +260,24 @@ func (s *TaskRepository) UpdateTask(ctx context.Context, task *tsks_pb.Task) err
 	return nil
 }
 
-func (s *TaskRepository) DeleteTask(ctx context.Context, userID, groupID, taskID int64) error {
+func (s *TaskRepository) DeleteUserTask(ctx context.Context, userID, taskID int64) error {
 	query := `
 	DELETE FROM tasks 
-	WHERE id=$1 AND (created_by=$2 OR EXISTS(SELECT 1 FROM tasks_groups WHERE task_id=$1 AND group_id=$3))`
+	WHERE id=$1 AND created_by=$2`
 
-	_, err := s.db.ExecContext(ctx, query, taskID, userID, groupID)
+	_, err := s.db.ExecContext(ctx, query, taskID, userID)
+	if err != nil {
+		return fmt.Errorf("error executing delete query: %w", err)
+	}
+
+	return nil
+}
+
+func (s *TaskRepository) DeleteGroupTask(ctx context.Context, taskID int64) error {
+	query := `
+	DELETE FROM tasks WHERE id=$1`
+
+	_, err := s.db.ExecContext(ctx, query, taskID)
 	if err != nil {
 		return fmt.Errorf("error executing delete query: %w", err)
 	}

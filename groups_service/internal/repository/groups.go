@@ -126,11 +126,6 @@ func (gr *GroupsRepository) CreateGroup(ctx context.Context, group *grpc_pb.Grou
 	if _, err := txn.ExecContext(ctx, query, group.OwnerID, group.ID, "admin"); err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code {
-			case "23503": // Код ошибки для FOREIGN KEY violation
-				switch pqErr.Constraint {
-				case "fk_member_group":
-					return 0, fmt.Errorf("group with id %d does not exist%w", group.ID, ErrNotExists)
-				}
 			case "23514": // Код ошибки для CHECK violation
 				if pqErr.Constraint == "no_group_member_role" {
 					return 0, ErrInvalideRole
@@ -139,6 +134,8 @@ func (gr *GroupsRepository) CreateGroup(ctx context.Context, group *grpc_pb.Grou
 				return 0, fmt.Errorf("database error: %s", pqErr.Message)
 			}
 		}
+
+		return 0, err
 	}
 
 	if err := txn.Commit(); err != nil {
@@ -168,9 +165,10 @@ func (gr *GroupsRepository) GetGroup(ctx context.Context, userID, groupID int64)
 }
 
 func (gr *GroupsRepository) ListUserGroups(ctx context.Context, userID int64, padding int64) ([]*models.Group, error) {
+	fmt.Println(userID, padding)
 	query := `
 		SELECT * FROM groups
-		WHERE id IN (SELECT group_id FROM group_members WHERE user_id=$1) OFFSET $2 LIMIT 10
+		WHERE id IN (SELECT group_id FROM group_members WHERE user_id=$1) ORDER BY created_at OFFSET $2 LIMIT 10
 	`
 
 	var groups []*models.Group
@@ -193,13 +191,9 @@ func (gr *GroupsRepository) DeleteGroup(ctx context.Context, ownerID, groupID in
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	_, err = result.RowsAffected()
 	if err != nil {
-		return ErrNotFound
-	}
-
-	if rowsAffected == 0 {
-		return ErrNotFound
+		return err
 	}
 
 	return nil
@@ -222,10 +216,6 @@ func (gr *GroupsRepository) UpdateGroup(ctx context.Context, group *grpc_pb.Grou
 		fields = append(fields, fmt.Sprintf("description=$%d", argPos))
 		args = append(args, group.Description)
 		argPos++
-	}
-
-	if len(fields) == 0 {
-		return ErrNothingToUpdate
 	}
 
 	query := fmt.Sprintf("UPDATE groups SET %s WHERE id=$1", strings.Join(fields, ", "))
@@ -254,17 +244,14 @@ func (gr *GroupsRepository) ListGroupMembers(ctx context.Context, groupID int64)
 
 	var users []*models.GroupMember
 	err := gr.db.SelectContext(ctx, &users, query, groupID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
 	return users, nil
 }
 
-func (gr *GroupsRepository) AddGroupMember(ctx context.Context, ownerID int64, member *grpc_pb.GroupMember) error {
+func (gr *GroupsRepository) AddGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error {
 	if member.Role == "" {
 		member.Role = "member"
 	}
@@ -326,12 +313,9 @@ func (gr *GroupsRepository) RemoveGroupMember(ctx context.Context, member *grpc_
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	_, err = result.RowsAffected()
 	if err != nil {
 		return err
-	}
-	if rowsAffected == 0 {
-		return ErrNotFound
 	}
 
 	return nil
@@ -354,6 +338,17 @@ func (gr *GroupsRepository) ChangeMemberRole(ctx context.Context, ownerID int64,
 
 	result, err := gr.db.ExecContext(ctx, query, member.Role, member.GroupID, member.UserID)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code {
+			case "23514": // Код ошибки для CHECK violation
+				if pqErr.Constraint == "no_group_member_role" {
+					return ErrInvalideRole
+				}
+			default:
+				return fmt.Errorf("database error: %s", pqErr.Message)
+			}
+		}
+
 		return err
 	}
 

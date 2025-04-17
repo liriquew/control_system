@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/liriquew/control_system/internal/config"
+	"github.com/liriquew/control_system/internal/lib/config"
 )
 
 type Suite struct {
 	*testing.T
-	TestConfig *config.AppConfig
+	TestConfig *config.AppTestConfig
 }
 
 func New(t *testing.T) *Suite {
 	t.Helper()
 
-	cfg := config.MustLoadPath("../config/test_config.yaml")
+	cfg := config.MustLoadPathTest("../config/test_config.yaml")
 
 	return &Suite{
 		TestConfig: &cfg,
@@ -23,5 +23,5 @@ func New(t *testing.T) *Suite {
 }
 
 func (s *Suite) GetURL() string {
-	return fmt.Sprintf("http://%s:%d", s.TestConfig.APIService.Host, s.TestConfig.APIService.Port)
+	return fmt.Sprintf("http://%s:%d", s.TestConfig.API.Host, s.TestConfig.API.Port)
 }

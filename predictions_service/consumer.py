@@ -57,7 +57,6 @@ class KafkaMLConsumer:
                 
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
-                    self._logger.info(f"revieved message: {data}")
                     self._db.save_task_prediction_data(
                         task_id=data["ID"],
                         UID=data["UserID"],
@@ -88,7 +87,7 @@ class KafkaMLConsumer:
                 
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
-                    self._logger.info(f"revieved message: {data}")
+                    self._logger.info(f"recieved message: {data}")
                     self._db.delete_task_prediction_data(task_id=data["ID"])
                 except json.JSONDecodeError as e:
                     self._logger.error(f"Invalid JSON: {e}")

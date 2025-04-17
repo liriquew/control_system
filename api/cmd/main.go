@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,32 +11,30 @@ import (
 	"time"
 
 	"github.com/liriquew/control_system/internal/app"
-	"github.com/liriquew/control_system/internal/config"
+	"github.com/liriquew/control_system/internal/lib/config"
+	"github.com/liriquew/control_system/pkg/logger"
+	"github.com/liriquew/control_system/pkg/logger/sl"
 )
 
-type API struct {
-	infoLog  *log.Logger
-	errorLog *log.Logger
-}
-
 func main() {
-	infoLog := log.New(os.Stdout, "INFO\t", log.Ltime)
-	errorLog := log.New(os.Stderr, "ERROR\t", log.Ltime)
+	log := logger.SetupPrettySlog("API_GATEWAY")
 
 	cfg := config.MustLoad()
 
-	r := app.New(infoLog, errorLog, cfg)
+	log.Info("", slog.Any("CONFIG", cfg))
+
+	r := app.New(log, cfg)
 
 	srv := &http.Server{
 		Addr:    ":" + "8080",
 		Handler: r.Router,
 	}
 
-	infoLog.Println("RUN SERVER: localhost:8080")
+	log.Info("RUN SERVER: localhost:8080")
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errorLog.Println("listen", err)
+			log.Error("listen", sl.Err(err))
 		}
 	}()
 
@@ -45,13 +43,13 @@ func main() {
 
 	<-stop
 
-	infoLog.Println("Shutting down server...")
+	log.Info("Shutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		errorLog.Println("Server forced to shutdown:", err)
+		log.Info("Server forced to shutdown:", sl.Err(err))
 	}
 
-	infoLog.Println("Server exiting")
+	log.Info("Server exiting")
 }

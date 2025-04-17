@@ -12,7 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func New(authAPI auth.AuthAPI, taskAPI task.TaskAPI, groupsAPI groups.GroupsAPI, graphsAPI graphs.GpraphsAPI) *chi.Mux {
+func New(
+	authAPI auth.AuthService,
+	taskAPI task.TasksService,
+	groupsAPI groups.GroupsService,
+	graphsAPI graphs.GraphsService,
+) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Recoverer)
@@ -24,61 +29,78 @@ func New(authAPI auth.AuthAPI, taskAPI task.TaskAPI, groupsAPI groups.GroupsAPI,
 		r.Post("/signin", http.HandlerFunc(authAPI.SignIn))
 		r.Post("/signup", http.HandlerFunc(authAPI.SignUp))
 
-		r.With(authAPI.AuthRequired).Route("/tasks", func(r chi.Router) {
+		r.With(authAPI.Authenticate).Route("/tasks", func(r chi.Router) {
 			r.Post("/", http.HandlerFunc(taskAPI.CreateTask))
 			r.Get("/", http.HandlerFunc(taskAPI.GetTaskList))
-			r.Get("/{id}", http.HandlerFunc(taskAPI.GetTask))
-			r.Patch("/{id}", http.HandlerFunc(taskAPI.UpdateTask))
-			r.Delete("/{id}", http.HandlerFunc(taskAPI.DeleteTask))
-			r.Get("/predict/*", http.HandlerFunc(taskAPI.Predict))
+
+			r.With(taskAPI.ExtractTaskID).Route("/{taskID}", func(r chi.Router) {
+				r.Get("/", http.HandlerFunc(taskAPI.GetTask))
+				r.Patch("/", http.HandlerFunc(taskAPI.UpdateTask))
+				r.Delete("/", http.HandlerFunc(taskAPI.DeleteTask))
+				r.Get("/predict", http.HandlerFunc(taskAPI.PredictTask))
+			})
 		})
-		r.With(authAPI.AuthRequired).Route("/groups", func(r chi.Router) {
+
+		r.With(authAPI.Authenticate).Route("/groups", func(r chi.Router) {
 			r.Post("/", http.HandlerFunc(groupsAPI.CreateGroup))
 			r.Get("/", http.HandlerFunc(groupsAPI.ListUserGroups))
 
-			r.With(groups.ExtractGroupID).Route("/{groupID}", func(r chi.Router) {
-				r.Get("/", http.HandlerFunc(groupsAPI.GetGroup))
-				r.Delete("/", http.HandlerFunc(groupsAPI.DeleteGroup))
-				r.Patch("/", http.HandlerFunc(groupsAPI.UpdateGroup))
+			r.Route("/{groupID}", func(r chi.Router) {
+				r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(groupsAPI.GetGroup))
+				r.With(groupsAPI.CheckEditorPermission).Patch("/", http.HandlerFunc(groupsAPI.UpdateGroup))
+				r.With(groupsAPI.CheckAdminPermission).Delete("/", http.HandlerFunc(groupsAPI.DeleteGroup))
 
-				r.Route("/members", func(r chi.Router) {
-					r.Post("/", http.HandlerFunc(groupsAPI.AddGroupMember))
-					r.Get("/", http.HandlerFunc(groupsAPI.ListGroupMembers))
-					r.With(groups.ExtractMemberID).Delete("/{memberID}", http.HandlerFunc(groupsAPI.RemoveGroupMember))
-					r.With(groups.ExtractMemberID).Patch("/{memberID}/role", http.HandlerFunc(groupsAPI.ChangeMemberRole))
-				})
-				r.Route("/graphs", func(r chi.Router) {
-					r.Post("/", http.HandlerFunc(groupsAPI.CreateGroupGraph))
-					r.Get("/", http.HandlerFunc(groupsAPI.ListGroupGraphs))
-				})
-			})
-		})
-
-		r.With(authAPI.AuthRequired, graphs.GraphIDGetter).Route("/graphs/{graphID}", func(r chi.Router) {
-			r.Get("/", http.HandlerFunc(graphsAPI.GetGraph))
-			r.Get("/predict", http.HandlerFunc(graphsAPI.PredictGraph))
-
-			r.Route("/nodes", func(r chi.Router) {
-				r.Post("/", http.HandlerFunc(graphsAPI.CreateNode))
-
-				r.With(graphs.NodeIDGetter).Route("/{nodeID}", func(r chi.Router) {
-					r.Get("/", http.HandlerFunc(graphsAPI.GetNode))
-					r.Delete("/", http.HandlerFunc(graphsAPI.RemoveNode))
-					r.Patch("/", http.HandlerFunc(graphsAPI.UpdateNode))
-
-					r.Route("/dependencies", func(r chi.Router) {
-						r.Get("/", http.HandlerFunc(graphsAPI.GetDependencies))
-						r.With(graphs.DependencyNodeIDGetter).Route("/{dependencyNodeID}", func(r chi.Router) {
-							r.Post("/", http.HandlerFunc(graphsAPI.AddDependency))
-							r.Delete("/", http.HandlerFunc(graphsAPI.RemoveDependensy))
-						})
+				r.Route("/tasks", func(r chi.Router) {
+					r.With(groupsAPI.CheckEditorPermission).Post("/", http.HandlerFunc(taskAPI.CreateTask))
+					// r.Get("/", http.HandlerFunc(taskAPI.GetTaskList))
+					r.Route("/{taskID}", func(r chi.Router) {
+						r.Use(taskAPI.ExtractTaskID)
+						r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(taskAPI.GetTask))
+						r.With(groupsAPI.CheckEditorPermission).Patch("/", http.HandlerFunc(taskAPI.UpdateTask))
+						r.With(groupsAPI.CheckEditorPermission).Delete("/", http.HandlerFunc(taskAPI.DeleteTask))
+						r.With(groupsAPI.CheckMemberPermission).Get("/predict", http.HandlerFunc(taskAPI.PredictTask))
 					})
 				})
 
-			})
-		})
+				r.Route("/members", func(r chi.Router) {
+					r.With(groupsAPI.CheckAdminPermission).Post("/", http.HandlerFunc(groupsAPI.AddGroupMember))
+					r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(groupsAPI.ListGroupMembers))
+					r.With(groupsAPI.CheckAdminPermission, groupsAPI.ExtractMemberID).
+						Delete("/{memberID}", http.HandlerFunc(groupsAPI.RemoveGroupMember))
+					r.With(groupsAPI.CheckAdminPermission, groupsAPI.ExtractMemberID).
+						Patch("/{memberID}/role", http.HandlerFunc(groupsAPI.ChangeMemberRole))
+				})
 
-	})
+				r.Route("/graphs", func(r chi.Router) {
+					r.With(groupsAPI.CheckAdminPermission).Post("/", http.HandlerFunc(graphsAPI.CreateGroupGraph))
+					r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(graphsAPI.ListGroupGraphs))
+
+					r.With(graphsAPI.GraphIDGetter).Route("/{graphID}", func(r chi.Router) {
+						r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(graphsAPI.GetGraph))
+						r.With(groupsAPI.CheckMemberPermission).Get("/predict", http.HandlerFunc(graphsAPI.PredictGraph))
+
+						r.Route("/nodes", func(r chi.Router) {
+							r.With(groupsAPI.CheckEditorPermission).Post("/", http.HandlerFunc(graphsAPI.CreateNode))
+
+							r.With(graphsAPI.NodeIDGetter).Route("/{nodeID}", func(r chi.Router) {
+								r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(graphsAPI.GetNode))
+								r.With(groupsAPI.CheckEditorPermission).Delete("/", http.HandlerFunc(graphsAPI.RemoveNode))
+								r.With(groupsAPI.CheckEditorPermission).Patch("/", http.HandlerFunc(graphsAPI.UpdateNode))
+
+								r.Route("/dependencies", func(r chi.Router) {
+									r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(graphsAPI.GetDependencies))
+									r.With(graphsAPI.DependencyNodeIDGetter).Route("/{dependencyNodeID}", func(r chi.Router) {
+										r.With(groupsAPI.CheckEditorPermission).Post("/", http.HandlerFunc(graphsAPI.AddDependency))
+										r.With(groupsAPI.CheckEditorPermission).Delete("/", http.HandlerFunc(graphsAPI.RemoveDependency))
+									})
+								})
+							})
+						})
+					})
+				}) // graphs
+			}) // {groupID}
+		}) // groups
+	}) // api
 
 	return r
 }
