@@ -24,7 +24,7 @@ type GroupsRepository interface {
 	CheckAccess(ctx context.Context, userID, groupID int64) error
 
 	CreateGroup(ctx context.Context, group *grpc_pb.Group) (int64, error)
-	ListUserGroups(ctx context.Context, userID int64, padding int64) ([]*models.Group, error)
+	ListUserGroups(ctx context.Context, userID int64, offset int64) ([]*models.Group, error)
 	GetGroup(ctx context.Context, userID, groupID int64) (*models.Group, error)
 	DeleteGroup(ctx context.Context, ownerID, groupID int64) error
 	UpdateGroup(ctx context.Context, group *grpc_pb.Group) error
@@ -95,14 +95,14 @@ func (s *serverAPI) CreateGroup(ctx context.Context, group *grpc_pb.Group) (*grp
 	}, nil
 }
 
-func (s *serverAPI) ListUserGroups(ctx context.Context, padding *grpc_pb.Padding) (*grpc_pb.GroupsList, error) {
+func (s *serverAPI) ListUserGroups(ctx context.Context, offset *grpc_pb.Offset) (*grpc_pb.GroupsList, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
 		return nil, err
 	}
 
-	groups, err := s.repository.ListUserGroups(ctx, userID, padding.Padding)
+	groups, err := s.repository.ListUserGroups(ctx, userID, offset.Offset)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		s.log.Error("error while listing user's groups", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")

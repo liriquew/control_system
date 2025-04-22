@@ -24,7 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GroupsClient interface {
 	CreateGroup(ctx context.Context, in *Group, opts ...grpc.CallOption) (*GroupID, error)
-	ListUserGroups(ctx context.Context, in *Padding, opts ...grpc.CallOption) (*GroupsList, error)
+	ListUserGroups(ctx context.Context, in *Offset, opts ...grpc.CallOption) (*GroupsList, error)
 	GetGroup(ctx context.Context, in *GroupID, opts ...grpc.CallOption) (*Group, error)
 	DeleteGroup(ctx context.Context, in *GroupID, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	UpdateGroup(ctx context.Context, in *Group, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -54,7 +54,7 @@ func (c *groupsClient) CreateGroup(ctx context.Context, in *Group, opts ...grpc.
 	return out, nil
 }
 
-func (c *groupsClient) ListUserGroups(ctx context.Context, in *Padding, opts ...grpc.CallOption) (*GroupsList, error) {
+func (c *groupsClient) ListUserGroups(ctx context.Context, in *Offset, opts ...grpc.CallOption) (*GroupsList, error) {
 	out := new(GroupsList)
 	err := c.cc.Invoke(ctx, "/groups.Groups/ListUserGroups", in, out, opts...)
 	if err != nil {
@@ -158,7 +158,7 @@ func (c *groupsClient) CheckMemberPermission(ctx context.Context, in *GroupMembe
 // for forward compatibility
 type GroupsServer interface {
 	CreateGroup(context.Context, *Group) (*GroupID, error)
-	ListUserGroups(context.Context, *Padding) (*GroupsList, error)
+	ListUserGroups(context.Context, *Offset) (*GroupsList, error)
 	GetGroup(context.Context, *GroupID) (*Group, error)
 	DeleteGroup(context.Context, *GroupID) (*emptypb.Empty, error)
 	UpdateGroup(context.Context, *Group) (*emptypb.Empty, error)
@@ -179,7 +179,7 @@ type UnimplementedGroupsServer struct {
 func (UnimplementedGroupsServer) CreateGroup(context.Context, *Group) (*GroupID, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateGroup not implemented")
 }
-func (UnimplementedGroupsServer) ListUserGroups(context.Context, *Padding) (*GroupsList, error) {
+func (UnimplementedGroupsServer) ListUserGroups(context.Context, *Offset) (*GroupsList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUserGroups not implemented")
 }
 func (UnimplementedGroupsServer) GetGroup(context.Context, *GroupID) (*Group, error) {
@@ -244,7 +244,7 @@ func _Groups_CreateGroup_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _Groups_ListUserGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Padding)
+	in := new(Offset)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func _Groups_ListUserGroups_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: "/groups.Groups/ListUserGroups",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GroupsServer).ListUserGroups(ctx, req.(*Padding))
+		return srv.(GroupsServer).ListUserGroups(ctx, req.(*Offset))
 	}
 	return interceptor(ctx, in, info, handler)
 }

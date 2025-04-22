@@ -10,18 +10,26 @@ import (
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 
 	"github.com/liriquew/control_system/internal/lib/config"
+	"github.com/liriquew/control_system/internal/lib/converter"
+	"github.com/liriquew/control_system/internal/models"
 	prdt_pb "github.com/liriquew/control_system/services_protos/predictions_service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type PredicionsClient struct {
+type PredictionsClient interface {
+	GetTags(ctx context.Context) ([]*models.Tag, error)
+	PredictTags(ctx context.Context, title, description string) ([]*models.Tag, error)
+	PredictTask(ctx context.Context, task *models.Task) (float64, error)
+}
+
+type GRPCPredicionsClient struct {
 	client prdt_pb.PredictionsClient
 	log    *slog.Logger
 }
 
-func NewPredictionsClient(log *slog.Logger, cfg config.ClientConfig) (*PredicionsClient, error) {
+func NewPredictionsClient(log *slog.Logger, cfg config.ClientConfig) (*GRPCPredicionsClient, error) {
 	const op = "predictionsclient.New"
 
 	retryOpts := []grpcretry.CallOption{
@@ -46,7 +54,7 @@ func NewPredictionsClient(log *slog.Logger, cfg config.ClientConfig) (*Predicion
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &PredicionsClient{
+	return &GRPCPredicionsClient{
 		client: prdt_pb.NewPredictionsClient(cc),
 		log:    log,
 	}, nil
@@ -63,20 +71,36 @@ var (
 	ErrInternal = errors.New("internal")
 )
 
-// func (c *PredicionsClient) Predict(ctx context.Context, task *models.Task) (float64, error) {
-// 	var userID int64
-// 	if task.GroupID != 0 {
-// 		userID = task.AssignedTo
-// 	} else {
-// 		userID = task.CreatedBy
-// 	}
-// 	predicted, err := c.client.Predict(ctx, &prdt_pb.PredictRequest{
-// 		UID:         userID,
-// 		PlannedTime: task.PlannedTime,
-// 	})
-// 	if err != nil {
-// 		return 0, err
-// 	}
+func (p *GRPCPredicionsClient) PredictTask(ctx context.Context, task *models.Task) (float64, error) {
+	resp, err := p.client.Predict(ctx, &prdt_pb.PredictRequest{Info: &prdt_pb.PredictInfo{
+		UID:         task.CreatedBy,
+		TagsIDs:     task.Tags,
+		PlannedTime: task.PlannedTime,
+	}})
+	if err != nil {
+		return 0, err
+	}
 
-// 	return predicted.ActualTime, nil
-// }
+	return resp.ActualTime, nil
+}
+
+func (p *GRPCPredicionsClient) GetTags(ctx context.Context) ([]*models.Tag, error) {
+	resp, err := p.client.GetTags(ctx, nil)
+	if err != nil {
+		return nil, ErrInternal
+	}
+
+	return converter.ConvertTagsToModel(resp.Tags), nil
+}
+
+func (p *GRPCPredicionsClient) PredictTags(ctx context.Context, title, description string) ([]*models.Tag, error) {
+	resp, err := p.client.PredictTags(ctx, &prdt_pb.PredictTagRequest{
+		Title:       title,
+		Description: description,
+	})
+	if err != nil {
+		return nil, ErrInternal
+	}
+
+	return converter.ConvertTagsToModel(resp.Tags), nil
+}

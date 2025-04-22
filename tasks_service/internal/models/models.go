@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/lib/pq"
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -15,6 +16,7 @@ type Task struct {
 	GroupID     sql.NullInt64 `db:"group_id" json:"GroupID,omitempty"`
 	Title       string        `db:"title" json:"Title,omitempty"`
 	Description string        `db:"description" json:"Description,omitempty"`
+	Tags        pq.Int32Array `db:"tags" json:"Tags,omitempty"`
 	PlannedTime float64       `db:"planned_time" json:"PlannedTime,omitempty"`
 	ActualTime  float64       `db:"actual_time" json:"ActualTime,omitempty"`
 	CreatedAt   time.Time     `db:"created_at" json:"CreatedAt,omitempty"`
@@ -28,6 +30,7 @@ func ConvertModelToProto(task *Task) *tsks_pb.Task {
 		GroupID:     task.GroupID.Int64,
 		Title:       task.Title,
 		Description: task.Description,
+		Tags:        task.Tags,
 		PlannedTime: task.PlannedTime,
 		ActualTime:  task.ActualTime,
 		CreatedAt:   timestamppb.New(task.CreatedAt),
@@ -35,10 +38,11 @@ func ConvertModelToProto(task *Task) *tsks_pb.Task {
 }
 
 type TaskPredictionData struct {
-	ID          int64   `json:"ID,omitempty"`
-	UserID      int64   `json:"UserID,omitempty"`
-	PlannedTime float64 `json:"PlannedTime,omitempty"`
-	ActualTime  float64 `json:"ActualTime,omitempty"`
+	ID          int64   `json:"id,omitempty"`
+	UserID      int64   `json:"user_id,omitempty"`
+	PlannedTime float64 `json:"planned_time,omitempty"`
+	ActualTime  float64 `json:"actual_time,omitempty"`
+	Tags        []int32 `json:"tags,omitempty"`
 }
 
 func GetPredictionData(task *tsks_pb.Task) *TaskPredictionData {
@@ -46,6 +50,7 @@ func GetPredictionData(task *tsks_pb.Task) *TaskPredictionData {
 		ID:          task.ID,
 		PlannedTime: task.PlannedTime,
 		ActualTime:  task.ActualTime,
+		Tags:        task.Tags,
 	}
 
 	if task.GroupID != 0 {

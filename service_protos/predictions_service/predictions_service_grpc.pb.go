@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -24,6 +25,8 @@ const _ = grpc.SupportPackageIsVersion7
 type PredictionsClient interface {
 	Predict(ctx context.Context, in *PredictRequest, opts ...grpc.CallOption) (*PredictResponse, error)
 	PredictList(ctx context.Context, in *PredictListRequest, opts ...grpc.CallOption) (*PredictListResponse, error)
+	PredictTags(ctx context.Context, in *PredictTagRequest, opts ...grpc.CallOption) (*PredictTagResponse, error)
+	GetTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TagList, error)
 }
 
 type predictionsClient struct {
@@ -52,12 +55,32 @@ func (c *predictionsClient) PredictList(ctx context.Context, in *PredictListRequ
 	return out, nil
 }
 
+func (c *predictionsClient) PredictTags(ctx context.Context, in *PredictTagRequest, opts ...grpc.CallOption) (*PredictTagResponse, error) {
+	out := new(PredictTagResponse)
+	err := c.cc.Invoke(ctx, "/predictions.Predictions/PredictTags", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *predictionsClient) GetTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TagList, error) {
+	out := new(TagList)
+	err := c.cc.Invoke(ctx, "/predictions.Predictions/GetTags", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PredictionsServer is the server API for Predictions service.
 // All implementations must embed UnimplementedPredictionsServer
 // for forward compatibility
 type PredictionsServer interface {
 	Predict(context.Context, *PredictRequest) (*PredictResponse, error)
 	PredictList(context.Context, *PredictListRequest) (*PredictListResponse, error)
+	PredictTags(context.Context, *PredictTagRequest) (*PredictTagResponse, error)
+	GetTags(context.Context, *emptypb.Empty) (*TagList, error)
 	mustEmbedUnimplementedPredictionsServer()
 }
 
@@ -70,6 +93,12 @@ func (UnimplementedPredictionsServer) Predict(context.Context, *PredictRequest) 
 }
 func (UnimplementedPredictionsServer) PredictList(context.Context, *PredictListRequest) (*PredictListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PredictList not implemented")
+}
+func (UnimplementedPredictionsServer) PredictTags(context.Context, *PredictTagRequest) (*PredictTagResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PredictTags not implemented")
+}
+func (UnimplementedPredictionsServer) GetTags(context.Context, *emptypb.Empty) (*TagList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTags not implemented")
 }
 func (UnimplementedPredictionsServer) mustEmbedUnimplementedPredictionsServer() {}
 
@@ -120,6 +149,42 @@ func _Predictions_PredictList_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Predictions_PredictTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PredictTagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PredictionsServer).PredictTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/predictions.Predictions/PredictTags",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PredictionsServer).PredictTags(ctx, req.(*PredictTagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Predictions_GetTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PredictionsServer).GetTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/predictions.Predictions/GetTags",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PredictionsServer).GetTags(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Predictions_ServiceDesc is the grpc.ServiceDesc for Predictions service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +199,14 @@ var Predictions_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PredictList",
 			Handler:    _Predictions_PredictList_Handler,
+		},
+		{
+			MethodName: "PredictTags",
+			Handler:    _Predictions_PredictTags_Handler,
+		},
+		{
+			MethodName: "GetTags",
+			Handler:    _Predictions_GetTags_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

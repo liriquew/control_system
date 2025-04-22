@@ -117,9 +117,9 @@ func (c *GRPCTasksClient) GetTask(ctx context.Context, taskID int64) (*models.Ta
 	return converter.ConvertTaskToModel(resp), nil
 }
 
-func (c *GRPCTasksClient) GetTaskList(ctx context.Context, padding int64) ([]*models.Task, error) {
+func (c *GRPCTasksClient) GetTaskList(ctx context.Context, offset int64) ([]*models.Task, error) {
 	resp, err := c.client.GetTaskList(ctx, &tsks_pb.TaskListRequest{
-		Padding: padding,
+		Offset: offset,
 	})
 	if err != nil {
 		return nil, err
@@ -220,7 +220,6 @@ func (c *GRPCTasksClient) GetGroupTasks(ctx context.Context, groupID int64) ([]*
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(resp)
 	return converter.ConvertTasksToModel(resp.Tasks), nil
 }
 

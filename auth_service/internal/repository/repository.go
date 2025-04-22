@@ -44,7 +44,6 @@ func NewAuthRepository(cfg config.StorageConfig) (*Repository, error) {
 		panic(op + ":" + err.Error())
 	}
 
-	fmt.Println("DB CONNECT OK")
 	return &Repository{
 		db: db,
 	}, nil

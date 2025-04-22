@@ -27,7 +27,7 @@ func NewTasksMiddleware(log *slog.Logger, client tasksclient.TasksClient) *Tasks
 func (g *TasksMiddleware) ExtractTaskID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
-		g.log.Debug("taskID in middleware", slog.Int64("taskID", taskID))
+		g.log.Debug("taskID in middleware ExtractTaskID", slog.Int64("taskID", taskID))
 		if err != nil {
 			http.Error(w, "taskID path param required", http.StatusBadRequest)
 			return
@@ -47,7 +47,7 @@ func GetTaskID(r *http.Request) int64 {
 	return id
 }
 
-func GetPadding(r *http.Request) int64 {
-	padding, _ := strconv.ParseInt(r.URL.Query().Get("padding"), 10, 64)
-	return padding
+func GetOffset(r *http.Request) int64 {
+	offset, _ := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
+	return offset
 }

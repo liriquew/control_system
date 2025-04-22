@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT,
     planned_time FLOAT NOT NULL,
     actual_time FLOAT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    tags INTEGER[]
 );
 
 CREATE TABLE IF NOT EXISTS tasks_groups (

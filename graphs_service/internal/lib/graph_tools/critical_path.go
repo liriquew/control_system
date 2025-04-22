@@ -269,7 +269,9 @@ func FindCriticalPath(graph graph_tools_interface.GraphWithNodes, nodesValueMap 
 	dfs = func(node int64, curr []int64) {
 		if amount := nodeAmountMap[node]; amount.max == 0 && amount.min == amount.max {
 			slices.Reverse(curr)
-			res = append(res, curr)
+			path := make([]int64, len(curr))
+			copy(path, curr)
+			res = append(res, path)
 			return
 		}
 

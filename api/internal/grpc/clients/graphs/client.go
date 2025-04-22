@@ -72,7 +72,7 @@ var (
 
 type GraphClient interface {
 	CreateGroupGraph(ctx context.Context, graph *entities.GraphWithNodes) (int64, error)
-	ListGroupGraphs(ctx context.Context, groupID, padding int64) ([]*entities.GraphWithNodes, error)
+	ListGroupGraphs(ctx context.Context, groupID, offset int64) ([]*entities.GraphWithNodes, error)
 	GetGraph(ctx context.Context, graphID int64) (*entities.GraphWithNodes, error)
 	GetNode(ctx context.Context, graphID int64) (*models.Node, error)
 	CreateNode(ctx context.Context, node *models.Node) (int64, error)
@@ -101,10 +101,10 @@ func (c *GRPCGraphClient) CreateGroupGraph(ctx context.Context, graph *entities.
 	return resp.GraphID, nil
 }
 
-func (c *GRPCGraphClient) ListGroupGraphs(ctx context.Context, groupID, padding int64) ([]*entities.GraphWithNodes, error) {
+func (c *GRPCGraphClient) ListGroupGraphs(ctx context.Context, groupID, offset int64) ([]*entities.GraphWithNodes, error) {
 	resp, err := c.client.ListGroupGraphs(ctx, &grph_pb.ListGroupGraphsRequest{
 		GroupID: groupID,
-		Padding: padding,
+		Offset:  offset,
 	})
 	if err != nil {
 		return nil, err

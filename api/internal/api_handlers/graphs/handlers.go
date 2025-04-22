@@ -91,11 +91,11 @@ func (g *Graphs) CreateGroupGraph(w http.ResponseWriter, r *http.Request) {
 
 func (g *Graphs) ListGroupGraphs(w http.ResponseWriter, r *http.Request) {
 	groupID := groups.GetGroupID(r)
-	padding := GetPadding(r)
+	offset := GetOffset(r)
 
-	graphs, err := g.graphsClient.ListGroupGraphs(r.Context(), groupID, padding)
+	graphs, err := g.graphsClient.ListGroupGraphs(r.Context(), groupID, offset)
 	if err != nil {
-		g.log.Error("error while listing group graphs", slog.Int64("groupID", groupID), slog.Int64("padding", padding), sl.Err(err))
+		g.log.Error("error while listing group graphs", slog.Int64("groupID", groupID), slog.Int64("offset", offset), sl.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

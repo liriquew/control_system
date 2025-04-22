@@ -74,10 +74,11 @@ func (c *PredicionsClient) Predict(ctx context.Context, task *models.Task) (floa
 	} else {
 		userID = task.CreatedBy
 	}
-	predicted, err := c.client.Predict(ctx, &prdt_pb.PredictRequest{
+	predicted, err := c.client.Predict(ctx, &prdt_pb.PredictRequest{Info: &prdt_pb.PredictInfo{
 		UID:         userID,
+		TagsIDs:     task.Tags,
 		PlannedTime: task.PlannedTime,
-	})
+	}})
 	if err != nil {
 		return 0, err
 	}
@@ -86,17 +87,18 @@ func (c *PredicionsClient) Predict(ctx context.Context, task *models.Task) (floa
 }
 
 func (c *PredicionsClient) PredictList(ctx context.Context, tasks []*models.Task) ([]*tsks_pb.PredictedTask, []int64, error) {
-	timesToPredict := make([]*prdt_pb.UserWithTime, 0, len(tasks))
+	timesToPredict := make([]*prdt_pb.PredictInfo, 0, len(tasks))
 	taskTimesMap := make(map[int64]float64, len(tasks))
 	for _, task := range tasks {
 		if task.ActualTime != 0 {
 			taskTimesMap[task.ID] = task.ActualTime
 			continue
 		}
-		timesToPredict = append(timesToPredict, &prdt_pb.UserWithTime{
-			ID:   task.ID,
-			UID:  task.AssignedTo.Int64,
-			Time: task.PlannedTime,
+		timesToPredict = append(timesToPredict, &prdt_pb.PredictInfo{
+			ID:          task.ID,
+			UID:         task.AssignedTo.Int64,
+			PlannedTime: task.PlannedTime,
+			TagsIDs:     task.Tags,
 		})
 	}
 
@@ -105,7 +107,7 @@ func (c *PredicionsClient) PredictList(ctx context.Context, tasks []*models.Task
 	if len(timesToPredict) != 0 {
 		predictedTimes := &prdt_pb.PredictListResponse{}
 		predictedTimes, err := c.client.PredictList(ctx, &prdt_pb.PredictListRequest{
-			PlannedUserTime: timesToPredict,
+			Infos: timesToPredict,
 		})
 		if err != nil {
 			if st, ok := status.FromError(err); ok {
@@ -120,7 +122,8 @@ func (c *PredicionsClient) PredictList(ctx context.Context, tasks []*models.Task
 		}
 		unpredictedUIDs = predictedTimes.UnpredictedUIDs
 		for _, predictedTime := range predictedTimes.PredictedUserTime {
-			taskTimesMap[predictedTime.ID] = predictedTime.Time
+			c.log.Debug("PREDICTED TIME:", slog.Int64("ID", predictedTime.ID), slog.Float64("TIME", predictedTime.PredictedTime))
+			taskTimesMap[predictedTime.ID] = predictedTime.PredictedTime
 		}
 	}
 

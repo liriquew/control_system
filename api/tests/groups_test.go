@@ -180,7 +180,7 @@ func TestListUserGroups(t *testing.T) {
 	createGroup(t, ts, token, group3)
 
 	// Получаем список групп
-	req, _ := http.NewRequest("GET", ts.GetURL()+"/api/groups?padding=1", nil)
+	req, _ := http.NewRequest("GET", ts.GetURL()+"/api/groups?offset=1", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(req)

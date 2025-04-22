@@ -1,8 +1,6 @@
 package models
 
 import (
-	"fmt"
-
 	grph_pb "github.com/liriquew/control_system/services_protos/graphs_service"
 )
 
@@ -82,7 +80,6 @@ func ConvertNodeToProto(node *Node) *grph_pb.Node {
 func ConvertNodesToProto(nodes []*Node) []*grph_pb.Node {
 	res := make([]*grph_pb.Node, 0, len(nodes))
 	for _, node := range nodes {
-		fmt.Println(node)
 		res = append(res, ConvertNodeToProto(node))
 	}
 	return res

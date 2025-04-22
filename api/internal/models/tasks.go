@@ -21,6 +21,17 @@ type Task struct {
 	Title       string    `json:"title,omitempty" db:"title"`
 	Description string    `json:"description,omitempty" db:"description"`
 	PlannedTime float64   `json:"planned_time,omitempty" db:"planned_time"`
+	Tags        []int32   `json:"tags,omitempty" db:"tags"`
 	ActualTime  float64   `json:"actual_time,omitempty" db:"actual_time"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+}
+
+type Tag struct {
+	ID          int32   `json:"id,omitempty"`
+	Name        string  `json:"name,omitempty"`
+	Probability float64 `json:"probability"`
+}
+
+type PredictedTime struct {
+	PredictedTime float64 `json:"predicted_time"`
 }

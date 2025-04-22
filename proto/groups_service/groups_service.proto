@@ -9,7 +9,7 @@ option go_package = "github.com/liriquew/control_system/services_protos;groups";
 
 service Groups {
     rpc CreateGroup(Group) returns (GroupID);
-    rpc ListUserGroups(Padding) returns (GroupsList);
+    rpc ListUserGroups(Offset) returns (GroupsList);
     rpc GetGroup(GroupID) returns (Group);
     rpc DeleteGroup(GroupID) returns (google.protobuf.Empty);
     rpc UpdateGroup(Group) returns (google.protobuf.Empty);
@@ -39,8 +39,8 @@ message GroupsList {
     repeated Group Groups = 1;
 }
 
-message Padding {
-    int64 Padding = 1;
+message Offset {
+    int64 Offset = 1;
 }
 
 

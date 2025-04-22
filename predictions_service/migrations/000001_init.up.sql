@@ -4,14 +4,17 @@ CREATE TABLE IF NOT EXISTS tasks (
     id BIGINT NOT NULL PRIMARY KEY,
     user_id BIGINT NOT NULL,
     planned_time FLOAT NOT NULL,
-    actual_time FLOAT
+    actual_time FLOAT, 
+    tags integer[]
 );
 
 -- m2m
 CREATE TABLE IF NOT EXISTS tasks_tags (
     task_id BIGINT NOT NULL,
+    tag_id BIGINT NOT NULL,
     tag varchar(20) NOT NULL,
 
+    CONSTRAINT pk_tasks_tags PRIMARY KEY (task_id, tag_id),  
     CONSTRAINT fk_tag_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
 );
 

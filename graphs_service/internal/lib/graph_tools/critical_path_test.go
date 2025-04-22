@@ -131,7 +131,7 @@ func TestFindCriticalPath(t *testing.T) {
 					},
 				},
 			},
-			criticalPathNodesIDs: [][]int64{{1, 2}, {3, 2}},
+			criticalPathNodesIDs: [][]int64{{3, 2}},
 			nodesValueMap: map[int64]float64{
 				1: 2, 2: 3, 3: 5,
 			},
@@ -219,7 +219,6 @@ func TestFindCriticalPath(t *testing.T) {
 			criticalPathNodesIDs: [][]int64{
 				{1, 2, 5},
 				{1, 3, 5},
-				{1, 4, 5},
 			},
 			nodesValueMap: map[int64]float64{
 				1: 1, 2: 2, 3: 2, 4: 2, 5: 3,

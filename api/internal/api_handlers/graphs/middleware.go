@@ -77,7 +77,7 @@ func GetDependencyNodeID(r *http.Request) int64 {
 	return id
 }
 
-func GetPadding(r *http.Request) int64 {
-	padding, _ := strconv.ParseInt(r.URL.Query().Get("padding"), 10, 64)
-	return padding
+func GetOffset(r *http.Request) int64 {
+	offset, _ := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
+	return offset
 }

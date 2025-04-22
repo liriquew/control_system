@@ -6,6 +6,7 @@ import sys
 from confluent_kafka import Consumer, KafkaException
 
 from database import Database
+from predicator import PredictInfo
 
 class KafkaMLConsumer:
     def __init__(
@@ -17,7 +18,10 @@ class KafkaMLConsumer:
             "bootstrap.servers": cfg["bootstrap_servers"],
             "group.id": cfg["group_id"],
             "auto.offset.reset": "earliest",
-            "enable.auto.commit": True
+            "enable.auto.commit": True,
+            "fetch.min.bytes": 1,         # Минимум данных для возврата
+            "fetch.wait.max.ms": 100,     # Макс время ожидания новых данных
+            "queued.min.messages": 10000,  # Минимум сообщений в локальной очереди
         })
         self._topic = cfg["topic"]
         
@@ -48,7 +52,7 @@ class KafkaMLConsumer:
         
         try:
             while True:
-                msg = self._consumer.poll(3.0)
+                msg = self._consumer.poll(0.01)
                 
                 if msg is None:
                     continue
@@ -57,12 +61,8 @@ class KafkaMLConsumer:
                 
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
-                    self._db.save_task_prediction_data(
-                        task_id=data["ID"],
-                        UID=data["UserID"],
-                        planned_time=data["PlannedTime"],
-                        actual_time=data["ActualTime"],
-                    )
+                    self._logger.info(f"recieved message: {data}")
+                    self._db.save_task_prediction_data(PredictInfo.from_dict(data))
                 except json.JSONDecodeError as e:
                     self._logger.error(f"Invalid JSON: {e}")
                 except Exception as e:
@@ -78,7 +78,7 @@ class KafkaMLConsumer:
         
         try:
             while True:
-                msg = self._consumer_delete.poll(3.0)
+                msg = self._consumer_delete.poll(0.01)
                 
                 if msg is None:
                     continue

@@ -3,6 +3,7 @@
 import grpc
 import warnings
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from predictions_service import predictions_service_pb2 as predictions__service_dot_predictions__service__pb2
 
 GRPC_GENERATED_VERSION = '1.68.1'
@@ -44,6 +45,16 @@ class PredictionsStub(object):
                 request_serializer=predictions__service_dot_predictions__service__pb2.PredictListRequest.SerializeToString,
                 response_deserializer=predictions__service_dot_predictions__service__pb2.PredictListResponse.FromString,
                 _registered_method=True)
+        self.PredictTags = channel.unary_unary(
+                '/predictions.Predictions/PredictTags',
+                request_serializer=predictions__service_dot_predictions__service__pb2.PredictTagRequest.SerializeToString,
+                response_deserializer=predictions__service_dot_predictions__service__pb2.PredictTagResponse.FromString,
+                _registered_method=True)
+        self.GetTags = channel.unary_unary(
+                '/predictions.Predictions/GetTags',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=predictions__service_dot_predictions__service__pb2.TagList.FromString,
+                _registered_method=True)
 
 
 class PredictionsServicer(object):
@@ -61,6 +72,18 @@ class PredictionsServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PredictTags(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTags(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_PredictionsServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -73,6 +96,16 @@ def add_PredictionsServicer_to_server(servicer, server):
                     servicer.PredictList,
                     request_deserializer=predictions__service_dot_predictions__service__pb2.PredictListRequest.FromString,
                     response_serializer=predictions__service_dot_predictions__service__pb2.PredictListResponse.SerializeToString,
+            ),
+            'PredictTags': grpc.unary_unary_rpc_method_handler(
+                    servicer.PredictTags,
+                    request_deserializer=predictions__service_dot_predictions__service__pb2.PredictTagRequest.FromString,
+                    response_serializer=predictions__service_dot_predictions__service__pb2.PredictTagResponse.SerializeToString,
+            ),
+            'GetTags': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTags,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=predictions__service_dot_predictions__service__pb2.TagList.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -129,6 +162,60 @@ class Predictions(object):
             '/predictions.Predictions/PredictList',
             predictions__service_dot_predictions__service__pb2.PredictListRequest.SerializeToString,
             predictions__service_dot_predictions__service__pb2.PredictListResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PredictTags(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/predictions.Predictions/PredictTags',
+            predictions__service_dot_predictions__service__pb2.PredictTagRequest.SerializeToString,
+            predictions__service_dot_predictions__service__pb2.PredictTagResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTags(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/predictions.Predictions/GetTags',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            predictions__service_dot_predictions__service__pb2.TagList.FromString,
             options,
             channel_credentials,
             insecure,

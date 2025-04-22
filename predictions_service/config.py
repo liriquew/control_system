@@ -61,3 +61,14 @@ class ConfigLoader:
             raise KeyError("В конфигурации отсутствует секция 'kafka'.")
 
         return app_config
+    
+    def get_classificator_config(self) -> dict:
+        """
+        Возвращает параметры для классификатора
+        """
+        app_config = self.config.get('tag_classificator')
+        if not app_config:
+            raise KeyError("В конфигурации отсутствует секция 'tag_classificator'.")
+
+        return app_config
+    

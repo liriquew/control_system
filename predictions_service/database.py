@@ -1,6 +1,10 @@
 import psycopg2
 import numpy as np
-import pickle
+
+from predicator import PredictInfo
+import psycopg2.extras
+
+from predicator import Tag, PredictInfo
 
 class ExceptionDB(Exception):
     NOT_FOUND = 0
@@ -25,14 +29,14 @@ class Database():
         )
  
 
-    def load_model(self, UID: int):
+    def load_model(self, UID: int) -> bytes:
         """
         Загружает созданную ранее модель пользователя
         """
         print("database.Database.load_model()")
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT model, is_active FROM models WHERE user_id = %s", (UID,))
+            cursor.execute("SELECT model, is_active FROM models WHERE user_id=%s", (UID,))
             result = cursor.fetchone()
             
             if result is None:
@@ -41,8 +45,7 @@ class Database():
             if not result[1]:
                 return None
 
-            model = pickle.loads(result[0])
-            return model
+            return result[0]
         except Exception as e:
             print(f"database.Database.load_model(): Error while loading model: {e}")
             raise e
@@ -50,23 +53,20 @@ class Database():
             cursor.close()
 
 
-    def save_model(self, UID: int, model):
+    def save_model(self, UID: int, model_blob: bytes):
         """
         Сохраняет модель и задачу пользователя в базу данных
         """
         print("database.Database.save_model()")
         try:
-            model_binary = pickle.dumps(model)
-
             cursor = self.conn.cursor()
             
-            # save model
             cursor.execute("""
                 INSERT INTO models (user_id, model, is_active) 
                 VALUES (%s, %s, %s) 
                 ON CONFLICT (user_id) DO UPDATE 
                 SET model = EXCLUDED.model, is_active=true""",
-                (UID, psycopg2.Binary(model_binary), True)
+                (UID, psycopg2.Binary(model_blob), True)
             )
 
             self.conn.commit()
@@ -101,16 +101,19 @@ class Database():
             cursor.close()
         
         
-    def get_user_tasks(self, UID:int) -> list[tuple[int, float, float]]:
+    def get_user_tasks(self, UID:int) -> list[PredictInfo]:
         """
         Выбирает все задачи пользователя, 
         которые имеют известное действительное время выполнения
         """
         print("database.Database.get_user_tasks()")
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                "SELECT id, planned_time, actual_time FROM tasks WHERE user_id=%s AND actual_time IS NOT NULL",
+            cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.execute("""
+                SELECT id, planned_time, actual_time, tags 
+                FROM tasks t 
+                WHERE user_id=%s AND actual_time IS NOT NULL
+            """,
                 (UID,)
             )
             result = cursor.fetchall()
@@ -118,9 +121,13 @@ class Database():
 
             if not result:
                 print(f"database.Database.get_user_tasks(): User UID: {UID} doesn't have completed tasks")
-                return np.array([]), np.array([])
-            
-            return result
+                return []
+
+            infos = []
+            for info in result:
+                infos.append(PredictInfo.from_dict(dict(info.items()), UID))
+
+            return infos
         except Exception as e:
             self.conn.rollback()
             print(f"database.Database.get_user_tasks(): Error while retrieving user tasks: {e}")
@@ -129,16 +136,20 @@ class Database():
             cursor.close()
 
     
-    def save_task_prediction_data(self, task_id: int, UID: int, planned_time: float, actual_time: float, tokens: list[str] = None):
+    def save_task_prediction_data(self, prediction_data: PredictInfo):
+        """
+        kafka consumer method
+        """
         try:
             cursor = self.conn.cursor()
             
             cursor.execute("""
-                INSERT INTO tasks (id, user_id, planned_time, actual_time) 
-                VALUES (%s, %s, %s, %s) 
+                INSERT INTO tasks (id, user_id, planned_time, actual_time, tags) 
+                VALUES (%s, %s, %s, %s, %s) 
                 ON CONFLICT (id) DO UPDATE 
-                SET planned_time=EXCLUDED.planned_time, actual_time=EXCLUDED.actual_time""",
-                (task_id, UID, planned_time, actual_time)
+                SET planned_time=EXCLUDED.planned_time, actual_time=EXCLUDED.actual_time, tags=EXCLUDED.tags""",
+                (prediction_data.id, prediction_data.uid, 
+                 prediction_data.planned_time, prediction_data.actual_time, prediction_data.tags)
             )
 
             self.conn.commit()
@@ -152,6 +163,9 @@ class Database():
 
 
     def delete_task_prediction_data(self, task_id: int):
+        """
+        kafka consumer method
+        """
         try:
             cursor = self.conn.cursor()
             

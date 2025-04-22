@@ -27,15 +27,15 @@ type GroupsAPI interface {
 	ChangeMemberRole(w http.ResponseWriter, r *http.Request)
 }
 
-type Group struct {
+type Groups struct {
 	groupsClient groupsclient.GroupsClient
 	tasksClient  tasksclient.TasksClient
 	authClient   authclient.AuthClient
 	log          *slog.Logger
 }
 
-func NewGroupsService(log *slog.Logger, groupsClient groupsclient.GroupsClient, tasksclient tasksclient.TasksClient, authClient authclient.AuthClient) *Group {
-	return &Group{
+func NewGroupsService(log *slog.Logger, groupsClient groupsclient.GroupsClient, tasksclient tasksclient.TasksClient, authClient authclient.AuthClient) *Groups {
+	return &Groups{
 		groupsClient: groupsClient,
 		tasksClient:  tasksclient,
 		authClient:   authClient,
@@ -43,7 +43,7 @@ func NewGroupsService(log *slog.Logger, groupsClient groupsclient.GroupsClient, 
 	}
 }
 
-func (g *Group) CreateGroup(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(auth.UserID{}).(int64)
 
 	group, err := models.GroupModelFromJson(r.Body)
@@ -77,12 +77,12 @@ func (g *Group) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	jsontools.WriteInt64ID(w, groupID)
 }
 
-func (g *Group) ListUserGroups(w http.ResponseWriter, r *http.Request) {
-	padding := GetPadding(r)
+func (g *Groups) ListUserGroups(w http.ResponseWriter, r *http.Request) {
+	offset := GetOffset(r)
 
-	groups, err := g.groupsClient.ListUserGroups(r.Context(), padding)
+	groups, err := g.groupsClient.ListUserGroups(r.Context(), offset)
 	if err != nil {
-		g.log.Error("error while listing user's groups", slog.Int64("userID", padding), sl.Err(err))
+		g.log.Error("error while listing user's groups", slog.Int64("userID", offset), sl.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -90,7 +90,7 @@ func (g *Group) ListUserGroups(w http.ResponseWriter, r *http.Request) {
 	jsontools.WtiteJSON(w, groups)
 }
 
-func (g *Group) GetGroup(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) GetGroup(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 
 	group, err := g.groupsClient.GetGroup(r.Context(), groupID)
@@ -126,7 +126,7 @@ func (g *Group) GetGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (g *Group) DeleteGroup(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 
 	err := g.groupsClient.DeleteGroup(r.Context(), groupID)
@@ -144,7 +144,7 @@ func (g *Group) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (g *Group) UpdateGroup(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 
 	group, err := models.GroupModelFromJson(r.Body)
@@ -178,7 +178,7 @@ func (g *Group) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (g *Group) ListGroupMembers(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) ListGroupMembers(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 
 	members, err := g.groupsClient.ListGroupMembers(r.Context(), groupID)
@@ -222,7 +222,7 @@ func (g *Group) ListGroupMembers(w http.ResponseWriter, r *http.Request) {
 	jsontools.WtiteJSON(w, resp)
 }
 
-func (g *Group) AddGroupMember(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) AddGroupMember(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 
 	groupMember, err := models.GroupMemberModelFromJson(r.Body)
@@ -258,7 +258,7 @@ func (g *Group) AddGroupMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (g *Group) RemoveGroupMember(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) RemoveGroupMember(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 	memberID := GetGroupMemberID(r)
 
@@ -282,7 +282,7 @@ func (g *Group) RemoveGroupMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (g *Group) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
+func (g *Groups) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
 	groupID := GetGroupID(r)
 	memberID := GetGroupMemberID(r)
 	newRole := GetNewRole(r)

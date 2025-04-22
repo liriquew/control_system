@@ -8,11 +8,11 @@ declare -A PIDS
 
 # Функция для остановки сервисов
 stop_services() {
-    echo "Stop..."
-    for pid in "${PIDS[@]}"; do
-        kill $pid
-    done
-    exit 0
+  echo "Stop..."
+  for pid in "${PIDS[@]}"; do
+    kill $pid
+  done
+  exit 0
 }
 
 # Перехватываем Ctrl+C
@@ -20,14 +20,14 @@ trap stop_services SIGINT
 
 # Запускаем сервисы
 start_service() {
-    local name=$1
-    local cmd=$2
-    local log="logs/${name}.log"
-    
-    echo "Start $name..."
-    eval "$cmd &"
-    sleep 1
-    PIDS[$name]=$!
+  local name=$1
+  local cmd=$2
+  local log="logs/${name}.log"
+
+  echo "Start $name..."
+  eval "$cmd &"
+  sleep 1
+  PIDS[$name]=$!
 }
 
 # Python-сервис
@@ -43,5 +43,5 @@ start_service "api_gateway" "cd api && go build -o api ./cmd/main.go && ./api"
 echo "Press Ctrl+C to stop all"
 
 while true; do
-    sleep 1
+  sleep 1
 done

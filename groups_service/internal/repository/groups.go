@@ -41,7 +41,6 @@ func NewGroupRepository(cfg config.StorageConfig) (*GroupsRepository, error) {
 		panic(op + ":" + err.Error())
 	}
 
-	fmt.Println("DB CONNECT OK")
 	return &GroupsRepository{
 		db: db,
 	}, nil
@@ -164,15 +163,14 @@ func (gr *GroupsRepository) GetGroup(ctx context.Context, userID, groupID int64)
 	return &group, err
 }
 
-func (gr *GroupsRepository) ListUserGroups(ctx context.Context, userID int64, padding int64) ([]*models.Group, error) {
-	fmt.Println(userID, padding)
+func (gr *GroupsRepository) ListUserGroups(ctx context.Context, userID int64, offset int64) ([]*models.Group, error) {
 	query := `
 		SELECT * FROM groups
 		WHERE id IN (SELECT group_id FROM group_members WHERE user_id=$1) ORDER BY created_at OFFSET $2 LIMIT 10
 	`
 
 	var groups []*models.Group
-	err := gr.db.SelectContext(ctx, &groups, query, userID, padding)
+	err := gr.db.SelectContext(ctx, &groups, query, userID, offset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("groups not found%w", ErrNotFound)

@@ -29,8 +29,9 @@ message Task {
     string Title = 5;
     string Description = 6;
     double PlannedTime = 7;
-    double ActualTime = 8;
-    google.protobuf.Timestamp CreatedAt = 9;
+    repeated int32 Tags = 8;
+    double ActualTime = 9;
+    google.protobuf.Timestamp CreatedAt = 10;
 }
 
 message TaskList {
@@ -52,7 +53,7 @@ message TaskExistsRequest {
 }
 
 message TaskListRequest {
-    int64 Padding = 1;
+    int64 Offset = 1;
 }
 
 message PredictedTask {

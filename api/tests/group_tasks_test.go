@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	mathrand "math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -164,8 +165,6 @@ func TestGetGroupTaskPermissions(t *testing.T) {
 		addGroupMember(t, ts, token1, groupID, member)
 
 		retrievedTask := getGroupTask(t, ts, token2, groupID, taskID)
-
-		fmt.Println(retrievedTask)
 
 		assert.Equal(t, task.Title, retrievedTask.Title)
 		assert.Equal(t, task.Description, retrievedTask.Description)
@@ -456,5 +455,144 @@ func TestDeleteGroupTask(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+}
+
+func TestPredictUncreatedTask(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: gofakeit.Password(true, true, true, true, false, 10),
+	}
+	_, token := doSignUpFakeUser(t, ts, user)
+
+	user2 := models.User{
+		Username: gofakeit.Username(),
+		Password: gofakeit.Password(true, true, true, true, false, 10),
+	}
+	user2, _ = doSignUpFakeUser(t, ts, user2)
+
+	group := models.Group{
+		Name:        gofakeit.Company(),
+		Description: gofakeit.Sentence(10),
+	}
+	groupID := createGroup(t, ts, token, group)
+
+	member := models.GroupMember{
+		UserID: user2.ID,
+		Role:   "member",
+	}
+	body, _ := json.Marshal(member)
+
+	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/groups/%d/members", ts.GetURL(), groupID), bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	http.DefaultClient.Do(req)
+
+	start := 10.0
+	add := 5.0
+
+	for range 10 {
+		task := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			AssignedTo:  user2.ID,
+			PlannedTime: start,
+			ActualTime:  start + mathrand.Float64()*5.0,
+			Tags: []int32{
+				mathrand.Int31n(100),
+				mathrand.Int31n(100),
+				mathrand.Int31n(100),
+			},
+		}
+		createGroupTask(t, ts, token, groupID, task)
+		start += add
+	}
+
+	task := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: ProbablyNormalTaskTime(100),
+		Tags:        GetRandTags(4, 100),
+	}
+	body, _ = json.Marshal(task)
+
+	t.Run("Success", func(t *testing.T) {
+		req, _ := http.NewRequest("GET",
+			fmt.Sprintf("%s/api/groups/%d/tasks/predict/%d", ts.GetURL(), groupID, user2.ID),
+			bytes.NewBuffer(body),
+		)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var predictedTime models.PredictedTime
+		json.NewDecoder(resp.Body).Decode(&predictedTime)
+		assert.NotZero(t, predictedTime.PredictedTime)
+	})
+
+	t.Run("Bad request", func(t *testing.T) {
+		req, _ := http.NewRequest("GET",
+			fmt.Sprintf("%s/api/groups/%d/tasks/predict/%d", ts.GetURL(), groupID, 999999),
+			bytes.NewBuffer(body),
+		)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("No tasks", func(t *testing.T) {
+		user2 := models.User{
+			Username: gofakeit.Username(),
+			Password: gofakeit.Password(true, true, true, true, false, 10),
+		}
+		user2, _ = doSignUpFakeUser(t, ts, user2)
+
+		group := models.Group{
+			Name:        gofakeit.Company(),
+			Description: gofakeit.Sentence(10),
+		}
+		groupID := createGroup(t, ts, token, group)
+
+		member := models.GroupMember{
+			UserID: user2.ID,
+			Role:   "member",
+		}
+		body, _ := json.Marshal(member)
+
+		req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/groups/%d/members", ts.GetURL(), groupID), bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		http.DefaultClient.Do(req)
+
+		req, _ = http.NewRequest("GET",
+			fmt.Sprintf("%s/api/groups/%d/tasks/predict/%d", ts.GetURL(), groupID, user2.ID),
+			bytes.NewBuffer(body),
+		)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var predictedTime models.PredictedTime
+		json.NewDecoder(resp.Body).Decode(&predictedTime)
+		assert.Zero(t, predictedTime.PredictedTime)
 	})
 }

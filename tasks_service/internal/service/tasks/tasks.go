@@ -25,7 +25,7 @@ type tasksRepository interface {
 	SaveTask(ctx context.Context, task *tsks_pb.Task) (int64, error)
 	GetGroupTasks(ctx context.Context, taskID int64) ([]*models.Task, error)
 	GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error)
-	GetTaskList(ctx context.Context, userID, padding int64) ([]*models.Task, error)
+	GetTaskList(ctx context.Context, userID, offset int64) ([]*models.Task, error)
 	UpdateTask(ctx context.Context, task *tsks_pb.Task) error
 	UpdateGroupTask(ctx context.Context, task *tsks_pb.Task) error
 	DeleteUserTask(ctx context.Context, userID, taskID int64) error
@@ -34,7 +34,6 @@ type tasksRepository interface {
 	TaskInAnyGroup(ctx context.Context, taskID int64) (int64, error)
 	TaskInGroup(ctx context.Context, groupID, taskID int64) error
 	GetTasks(ctx context.Context, taskIDs []int64) ([]*models.Task, error)
-	Done(ctx context.Context, taskID int64, time float64) error
 }
 
 type tasksProducer interface {
@@ -109,7 +108,7 @@ func (s *serverAPI) CreateTask(ctx context.Context, task *tsks_pb.Task) (*tsks_p
 		return nil, status.Error(codes.InvalidArgument, "forbidden to create completed task in group without task executor")
 	}
 
-	taskID, err := s.repository.SaveTask(ctx, task)
+	task.ID, err = s.repository.SaveTask(ctx, task)
 	if err != nil {
 		s.log.Error("error while saving task", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
@@ -123,7 +122,7 @@ func (s *serverAPI) CreateTask(ctx context.Context, task *tsks_pb.Task) (*tsks_p
 		}
 	}
 
-	return &tsks_pb.TaskID{ID: taskID}, nil
+	return &tsks_pb.TaskID{ID: task.ID}, nil
 }
 
 func (s *serverAPI) GetTask(ctx context.Context, taskID *tsks_pb.TaskID) (*tsks_pb.Task, error) {
@@ -157,7 +156,7 @@ func (s *serverAPI) GetTaskList(ctx context.Context, req *tsks_pb.TaskListReques
 		return nil, err
 	}
 
-	tasks, err := s.repository.GetTaskList(ctx, userID, req.Padding)
+	tasks, err := s.repository.GetTaskList(ctx, userID, req.Offset)
 	if err != nil {
 		s.log.Error("error while getting task:", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")

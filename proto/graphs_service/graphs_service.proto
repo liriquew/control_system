@@ -58,7 +58,7 @@ message GraphResponse {
 }
 
 message ListGroupGraphsRequest {
-    int64 Padding = 1;
+    int64 Offset = 1;
     int64 GroupID = 2;
 }
 

@@ -72,7 +72,7 @@ var (
 
 type GroupsClient interface {
 	CreateGroup(ctx context.Context, group *models.Group) (int64, error)
-	ListUserGroups(ctx context.Context, padding int64) ([]*models.Group, error)
+	ListUserGroups(ctx context.Context, offset int64) ([]*models.Group, error)
 	GetGroup(ctx context.Context, groupID int64) (*models.Group, error)
 	DeleteGroup(ctx context.Context, groupID int64) error
 	UpdateGroup(ctx context.Context, group *models.Group) error
@@ -104,10 +104,10 @@ func (g *GRPCGroupsClient) CreateGroup(ctx context.Context, group *models.Group)
 	return resp.ID, nil
 }
 
-func (g *GRPCGroupsClient) ListUserGroups(ctx context.Context, padding int64) ([]*models.Group, error) {
-	g.log.Debug("this is padding", slog.Int64("padding", padding))
-	resp, err := g.client.ListUserGroups(ctx, &grps_pb.Padding{
-		Padding: padding,
+func (g *GRPCGroupsClient) ListUserGroups(ctx context.Context, offset int64) ([]*models.Group, error) {
+	g.log.Debug("this is offset", slog.Int64("offset", offset))
+	resp, err := g.client.ListUserGroups(ctx, &grps_pb.Offset{
+		Offset: offset,
 	})
 	if err != nil {
 		return nil, err

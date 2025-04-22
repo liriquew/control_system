@@ -1,7 +1,6 @@
 package graphtools
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/liriquew/graphs_service/internal/entities"
@@ -78,7 +77,6 @@ func TestCountConnectedComponents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			count, err := CountConnectedComponents(graph_wrapper.WrapGraphWithNodes(tt.graph))
 			if (err != nil) != tt.wantErr {
-				fmt.Println(err)
 				t.Errorf("CountConnectedComponents() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

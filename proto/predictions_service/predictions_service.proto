@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
 package predictions;
 
 option go_package = "control_system.api;predictions";
@@ -7,29 +8,55 @@ option go_package = "control_system.api;predictions";
 service Predictions {
     rpc Predict (PredictRequest) returns (PredictResponse);
     rpc PredictList (PredictListRequest) returns (PredictListResponse);
+    rpc PredictTags (PredictTagRequest) returns (PredictTagResponse);
+    rpc GetTags (google.protobuf.Empty) returns (TagList);
+}
+
+message Tag {
+    string Name = 1;
+    double Probability = 2;
+    int32 Id = 3;
+}
+
+message PredictInfo {
+    int64 ID = 1;
+    int64 UID = 2;
+    repeated int32 TagsIDs = 3;
+    double PlannedTime = 4;
+}
+
+message PredictedInfo {
+    int64 ID = 1;
+    int64 UID = 2;
+    double PredictedTime = 3;
 }
 
 message PredictRequest {
-    int64 UID = 1;
-    double PlannedTime = 2;
+    PredictInfo Info = 2;
 }
 
 message PredictResponse {
     double ActualTime = 1;
-    string Status = 2;
-}
-
-message UserWithTime {
-    int64 ID = 1;
-    int64 UID = 2;
-    double Time = 3;
 }
 
 message PredictListRequest {
-    repeated UserWithTime PlannedUserTime = 1;
+    repeated PredictInfo Infos = 1;
 }
 
 message PredictListResponse {
-    repeated UserWithTime PredictedUserTime = 1;
+    repeated PredictedInfo PredictedUserTime = 1;
     repeated int64 UnpredictedUIDs = 2; // users IDs which doesn't have tasks
+}
+
+message PredictTagRequest {
+    string Title = 1;
+    string Description = 2;
+}
+
+message PredictTagResponse {
+    repeated Tag Tags = 1;
+}
+
+message TagList {
+    repeated Tag Tags = 1;
 }

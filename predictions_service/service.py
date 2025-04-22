@@ -1,11 +1,11 @@
 from sklearn.ensemble import GradientBoostingRegressor
 import numpy as np
 import grpc
-import predictions_service.predictions_service_pb2 as pb2
+import predictions_service.predictions_service_pb2 as pb
 
 
 from database import Database, ExceptionDB
-from config import ConfigLoader
+import predicator
 
 class PredicatorException(Exception):
     def __init__(self, message, extra_info):
@@ -13,45 +13,10 @@ class PredicatorException(Exception):
         self.extra_info = extra_info
 
 class PredictionService():
-    # параметры модели в зависимости от размера выборки (числа известных задач)
-    MODEL_PARAMS = [
-        {
-            'sample_size': 20,
-            'n_estimators': 10,
-            'max_depth': 3,
-            'min_samples_split': 2
-        },
-        {
-            'sample_size': 100,
-            'n_estimators': 50,
-            'learning_rate': 0.05,
-            'max_depth': 4,
-            'min_samples_split': 3
-        },
-        {
-            'sample_size': 500,
-            'n_estimators': 100,
-            'learning_rate': 0.1,
-            'max_depth': 5,
-            'min_samples_split': 5
-        }
-    ]
-
-
-    def __init__(self, db:Database):
+    def __init__(self, db:Database, tag_classificator: predicator.TagsPredicator):
         self.db = db
-
-
-    def get_model_params(self, sample_size: int):
-        """
-        Определяет параметры модели в зависимости от объема выборки
-        """
-        for params in self.MODEL_PARAMS:
-            if sample_size < params["sample_size"]:
-                return {k: v for k, v in params.items() if k != "sample_size"}
-        return {k: v for k, v in self.MODEL_PARAMS[-1].items() if k != "sample_size"}
-
-
+        self.tag_predicator = tag_classificator
+        
     def _validate_uid(self, uid: int):
         """
         Проверяет, что UID корректен
@@ -60,16 +25,7 @@ class PredictionService():
             raise PredicatorException("UID must be greater than zero", grpc.StatusCode.INVALID_ARGUMENT)
 
 
-    def _prepare_tasks_data(self, tasks: list) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Подготавливает данные задач для обучения модели
-        """
-        tasks_data = np.array(tasks).reshape(-1, 3)
-        _, planned_time, actual_time = np.array_split(tasks_data, 3, axis=1)
-        return planned_time, np.ravel(actual_time)
-
-
-    def fit_model(self, UID: int):
+    def create_model(self, UID: int) -> predicator.TaskPredicator:
         """
         Обучает и сохраняет модель
         """
@@ -78,18 +34,11 @@ class PredictionService():
 
         # выборка задач из бд
         tasks = self.db.get_user_tasks(UID)
-        if len(tasks[0]) == 0:
+        if len(tasks) == 0:
             self.db.delete_model(UID)
             raise PredicatorException(f"User with UID:{UID} does not have any completed tasks", grpc.StatusCode.FAILED_PRECONDITION)
 
-        planned_time, actual_time = self._prepare_tasks_data(tasks)
-
-        # Определение и сохранение модели
-        model_params = self.get_model_params(len(planned_time))
-        model = GradientBoostingRegressor(**model_params)
-        model.fit(planned_time, actual_time)
-        self.db.save_model(UID, model)
-
+        model = predicator.TaskPredicator.from_tasks(tasks=tasks)
         return model
 
 
@@ -102,59 +51,77 @@ class PredictionService():
         """
         print("predictions_service.Predicator.get_model()")
         try:
-            model = None
-            model = self.db.load_model(UID)
-        except ExceptionDB as e:
+            model_blob = None
+            model_blob = self.db.load_model(UID)
+            model = predicator.TaskPredicator.from_model_blob(model_blob)
+        except PredicatorException as pe:
+            raise pe
+        except ExceptionDB:
             pass
-        if model is None:
-            model = self.fit_model(UID)
+        if model_blob is None:
+            model = self.create_model(UID)
+            self.db.save_model(UID, model.dump())
         return model
 
 
-    def predict_single_value(self, model, value: float) -> float:
-        return float(model.predict([[value]])[0])
-
-
-    def make_predict(self, UID: int, PlannedTime: float) -> float:
+    def make_predict(self, info: predicator.PredictInfo) -> float:
         """
         Загружает модель из бд и предсказывает итоговое время выполнения задачи
         """
         print("predictions_service.Predicator.make_predict()")
-        self._validate_uid(UID)
-        if PlannedTime <= 0:
-            raise PredicatorException(f"Invalid PlannedTime (must be greater than zero)", grpc.StatusCode.INVALID_ARGUMENT)
+
+        self._validate_uid(info.uid)
         try:
-            model = self.get_model(UID)
+            model = self.get_model(info.uid)
         except PredicatorException as pe:
             if pe.extra_info == grpc.StatusCode.FAILED_PRECONDITION:
                 return 0.0
             raise pe
-        return self.predict_single_value(model, PlannedTime)
+
+        return model.predict(info)
     
 
-    def make_list_predict(self, users_with_times: list[pb2.UserWithTime]) -> tuple[list[pb2.UserWithTime], list[int]]:
+    def make_list_predict(self, predict_info: list[predicator.PredictInfo]) -> tuple[list[pb.PredictedInfo], list[int]]:
         """
         Загружает модель для каждого пользователя из бд
         и предсказывает итоговое время выполнения задач
         """
         print("predictions_service.Predicator.make_list_predict()")
-        if len(users_with_times) == 0:
+        if len(predict_info) == 0:
             raise PredicatorException(f"Empty user with time list", grpc.StatusCode.INVALID_ARGUMENT)
 
         cache = dict()
         unpredicted_uids = set()
-        
-        for i, user_with_time in enumerate(users_with_times):
-            if user_with_time.UID not in cache:
+
+        for i, info in enumerate(predict_info):
+            if info.uid not in cache:
                 try:
-                    model = self.get_model(user_with_time.UID)
-                    cache[user_with_time.UID] = model
+                    model = self.get_model(info.uid)
+                    cache[info.uid] = model
                 except PredicatorException:
                     # user doesn't have any tasks, nothing to predict
-                    unpredicted_uids.add(user_with_time.UID)
+                    predict_info[i].actual_time = predict_info[i].planned_time
+                    unpredicted_uids.add(info.uid)
                     continue
             else:
-                model = cache[user_with_time.UID]
-            users_with_times[i].Time = self.predict_single_value(model, user_with_time.Time)
+                model = cache[info.uid]
+            predict_info[i].actual_time = model.predict(info)
 
-        return users_with_times, list(unpredicted_uids)
+        return predict_info, list(unpredicted_uids)
+    
+
+    def predict_tags(self, title: str, description: str) -> list[predicator.Tag]:
+        """
+        Предсказывает теги по заголовку и описанию задачи
+        """
+        tags = self.tag_predicator.predict(title, description)
+
+        return tags
+    
+    def get_tags_list(self) -> list[predicator.Tag]:
+        try:
+            return self.tag_predicator.get_tags_list()
+        except Exception as e:
+            print(e)
+
+        return []

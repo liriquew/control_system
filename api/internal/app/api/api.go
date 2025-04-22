@@ -30,6 +30,10 @@ func New(
 		r.Post("/signup", http.HandlerFunc(authAPI.SignUp))
 
 		r.With(authAPI.Authenticate).Route("/tasks", func(r chi.Router) {
+			r.Route("/tags", func(r chi.Router) {
+				r.Get("/", http.HandlerFunc(taskAPI.GetTags))
+				r.Get("/predict", http.HandlerFunc(taskAPI.PredictTags))
+			})
 			r.Post("/", http.HandlerFunc(taskAPI.CreateTask))
 			r.Get("/", http.HandlerFunc(taskAPI.GetTaskList))
 
@@ -39,6 +43,7 @@ func New(
 				r.Delete("/", http.HandlerFunc(taskAPI.DeleteTask))
 				r.Get("/predict", http.HandlerFunc(taskAPI.PredictTask))
 			})
+			r.Get("/predict", http.HandlerFunc(taskAPI.PredictUncreatedTask))
 		})
 
 		r.With(authAPI.Authenticate).Route("/groups", func(r chi.Router) {
@@ -52,14 +57,19 @@ func New(
 
 				r.Route("/tasks", func(r chi.Router) {
 					r.With(groupsAPI.CheckEditorPermission).Post("/", http.HandlerFunc(taskAPI.CreateTask))
-					// r.Get("/", http.HandlerFunc(taskAPI.GetTaskList))
+
 					r.Route("/{taskID}", func(r chi.Router) {
 						r.Use(taskAPI.ExtractTaskID)
 						r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(taskAPI.GetTask))
 						r.With(groupsAPI.CheckEditorPermission).Patch("/", http.HandlerFunc(taskAPI.UpdateTask))
 						r.With(groupsAPI.CheckEditorPermission).Delete("/", http.HandlerFunc(taskAPI.DeleteTask))
-						r.With(groupsAPI.CheckMemberPermission).Get("/predict", http.HandlerFunc(taskAPI.PredictTask))
+						r.With(groupsAPI.CheckEditorPermission).Get("/predict", http.HandlerFunc(taskAPI.PredictTask))
 					})
+
+					r.With(
+						groupsAPI.CheckEditorPermission,
+						groupsAPI.CheckPredictedUserMemberPermission,
+					).Get("/predict/{predictedUserID}", http.HandlerFunc(taskAPI.PredictUncreatedTask))
 				})
 
 				r.Route("/members", func(r chi.Router) {

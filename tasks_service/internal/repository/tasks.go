@@ -46,7 +46,6 @@ func NewTaskRepository(cfg config.StorageConfig) (*TaskRepository, error) {
 		panic(op + ":" + err.Error())
 	}
 
-	fmt.Println("DB CONNECT OK")
 	return &TaskRepository{
 		db: db,
 	}, nil
@@ -65,12 +64,12 @@ func (s *TaskRepository) SaveTask(ctx context.Context, task *tsks_pb.Task) (int6
 		txn.Rollback()
 	}()
 
-	query := `INSERT INTO tasks (created_by, title, description, planned_time, actual_time)
-			  VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	query := `INSERT INTO tasks (created_by, title, description, planned_time, actual_time, tags)
+			  VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	err = txn.QueryRowContext(
 		ctx,
 		query,
-		task.CreatedBy, task.Title, task.Description, task.PlannedTime, task.ActualTime,
+		task.CreatedBy, task.Title, task.Description, task.PlannedTime, task.ActualTime, pq.Array(task.Tags),
 	).Scan(&task.ID)
 	if err != nil {
 		return 0, err
@@ -94,7 +93,8 @@ func (s *TaskRepository) SaveTask(ctx context.Context, task *tsks_pb.Task) (int6
 
 func (s *TaskRepository) GetGroupTasks(ctx context.Context, groupID int64) ([]*models.Task, error) {
 	query := `
-	SELECT t.id, t.created_by, t.title, t.description, t.planned_time, t.actual_time, t.created_at, 
+	SELECT t.id, t.created_by, t.title, t.description, t.planned_time, 
+		t.actual_time, t.created_at, t.tags,
 		tg.group_id, tg.assigned_to
 	FROM tasks t JOIN tasks_groups tg ON t.id = tg.task_id WHERE tg.group_id=$1`
 
@@ -113,7 +113,7 @@ func (s *TaskRepository) GetGroupTasks(ctx context.Context, groupID int64) ([]*m
 func (s *TaskRepository) GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) {
 	query := `
 	SELECT 
-		t.id, t.created_by, t.title, t.description, t.planned_time, t.actual_time, t.created_at, 
+		t.id, t.created_by, t.title, t.description, t.planned_time, t.actual_time, t.created_at, t.tags,
 		tg.group_id, tg.assigned_to
 	FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id WHERE t.id=$1
 	`
@@ -131,17 +131,18 @@ func (s *TaskRepository) GetTaskByID(ctx context.Context, taskID int64) (*models
 	return &task, nil
 }
 
-func (s *TaskRepository) GetTaskList(ctx context.Context, userID, padding int64) ([]*models.Task, error) {
+func (s *TaskRepository) GetTaskList(ctx context.Context, userID, offset int64) ([]*models.Task, error) {
 	query := `
 	SELECT 
-		t.id, t.created_by, t.title, t.description, t.planned_time, t.actual_time, t.created_at, 
+		t.id, t.created_by, t.title, t.description, 
+		t.planned_time, t.actual_time, t.created_at, t.tags, 
 		tg.group_id, tg.assigned_to
 	FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id WHERE t.created_by=$1 OR tg.assigned_to=$1 
 	ORDER BY t.created_at DESC
 	OFFSET $2 LIMIT $3
 	`
 	var tasks []*models.Task
-	err := s.db.SelectContext(ctx, &tasks, query, userID, padding, listTasksBatchSize)
+	err := s.db.SelectContext(ctx, &tasks, query, userID, offset, listTasksBatchSize)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
@@ -175,6 +176,11 @@ func (s *TaskRepository) UpdateTask(ctx context.Context, task *tsks_pb.Task) err
 		argPos++
 		fields = append(fields, fmt.Sprintf("title=$%d", argPos))
 		args = append(args, task.Title)
+	}
+	if len(task.Tags) != 0 {
+		argPos++
+		fields = append(fields, fmt.Sprintf("tags=$%d", argPos))
+		args = append(args, task.Tags)
 	}
 
 	query = fmt.Sprintf(query, strings.Join(fields, ", "))
@@ -218,6 +224,11 @@ func (s *TaskRepository) UpdateGroupTask(ctx context.Context, task *tsks_pb.Task
 		argPos++
 		fields = append(fields, fmt.Sprintf("title=$%d", argPos))
 		args = append(args, task.Title)
+	}
+	if len(task.Tags) != 0 {
+		argPos++
+		fields = append(fields, fmt.Sprintf("tags=$%d", argPos))
+		args = append(args, task.Tags)
 	}
 
 	query = fmt.Sprintf(query, strings.Join(fields, ", "))
@@ -274,8 +285,7 @@ func (s *TaskRepository) DeleteUserTask(ctx context.Context, userID, taskID int6
 }
 
 func (s *TaskRepository) DeleteGroupTask(ctx context.Context, taskID int64) error {
-	query := `
-	DELETE FROM tasks WHERE id=$1`
+	query := `DELETE FROM tasks WHERE id=$1`
 
 	_, err := s.db.ExecContext(ctx, query, taskID)
 	if err != nil {
@@ -314,11 +324,14 @@ func (s *TaskRepository) TaskInGroup(ctx context.Context, groupID, taskID int64)
 }
 
 func (s *TaskRepository) GetTasks(ctx context.Context, tasksIDs []int64) ([]*models.Task, error) {
-	query := `SELECT 
-		t.id, t.created_by, t.title, t.description, t.planned_time, t.actual_time, t.created_at, 
-		tg.group_id, tg.assigned_to
+	query := `
+		SELECT 
+			t.id, t.created_by, t.title, t.description, 
+			t.planned_time, t.actual_time, t.created_at, t.tags,
+			tg.group_id, tg.assigned_to
 		FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id 
-		WHERE id = ANY($1)`
+		WHERE id = ANY($1)
+	`
 
 	var tasks []*models.Task
 	if err := s.db.SelectContext(ctx, &tasks, query, pq.Array(tasksIDs)); err != nil {
@@ -330,24 +343,4 @@ func (s *TaskRepository) GetTasks(ctx context.Context, tasksIDs []int64) ([]*mod
 	}
 
 	return tasks, nil
-}
-
-func (s *TaskRepository) Done(ctx context.Context, taskID int64, time float64) error {
-	query := "UPDATE tasks SET actual_time=$1 WHERE id=$2"
-
-	result, err := s.db.ExecContext(ctx, query, time, taskID)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return ErrNotFound
-	}
-
-	return nil
 }

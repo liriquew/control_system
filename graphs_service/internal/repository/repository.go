@@ -42,7 +42,6 @@ func NewGraphsRepository(cfg config.StorageConfig) (*GraphsRepository, error) {
 		panic(op + ":" + err.Error())
 	}
 
-	fmt.Println("DB CONNECT OK")
 	return &GraphsRepository{
 		db: db,
 	}, nil
@@ -151,11 +150,11 @@ func (r *GraphsRepository) CreateGraph(ctx context.Context, graph *grph_pb.Graph
 	return graph.ID, nil
 }
 
-func (r *GraphsRepository) ListGroupGraphs(ctx context.Context, groupID, padding int64) ([]*entities.GraphWithNodes, error) {
+func (r *GraphsRepository) ListGroupGraphs(ctx context.Context, groupID, offset int64) ([]*entities.GraphWithNodes, error) {
 	query := `SELECT * FROM graphs WHERE group_id=$1 offset $2 limit $3`
 
 	var graphs []models.Graph
-	err := r.db.SelectContext(ctx, &graphs, query, groupID, padding, listGraphsBatchSize)
+	err := r.db.SelectContext(ctx, &graphs, query, groupID, offset, listGraphsBatchSize)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -379,7 +378,6 @@ func (r *GraphsRepository) GetDependencies(ctx context.Context, nodeID int64) (*
 
 func (r *GraphsRepository) AddDependency(ctx context.Context, graphID int64, dependency *grph_pb.Dependency) error {
 	query := "INSERT INTO dependencies (from_node_id, to_node_id, graph_id) VALUES ($1, $2, $3)"
-	// TODO: add constraint A -> B; B -> A will be rejected
 	if _, err := r.db.ExecContext(ctx, query, dependency.FromNodeID, dependency.ToNodeID, graphID); err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code {

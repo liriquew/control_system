@@ -32,8 +32,6 @@ func createGraph(t *testing.T, ts *suite.Suite, token string, groupID int64, gra
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	// msg, _ := io.ReadAll(resp.Body)
-	// fmt.Println(string(msg))
 
 	id := getID(t, resp)
 	return id
@@ -94,7 +92,6 @@ func TestCreateAndListGroupGraphs(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-
 	task1.ID = createGroupTask(t, ts, token, groupID, task1)
 
 	task2 := models.Task{
@@ -102,10 +99,8 @@ func TestCreateAndListGroupGraphs(t *testing.T) {
 		Description: gofakeit.JobDescriptor(),
 		PlannedTime: gofakeit.Float64(),
 	}
-
 	task2.ID = createGroupTask(t, ts, token, groupID, task2)
 
-	// Создаем граф
 	graph := entities.GraphWithNodes{
 		GraphInfo: &models.Graph{
 			Name: gofakeit.BeerName(),

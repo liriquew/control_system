@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	mathrand "math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -165,7 +166,7 @@ func TestGetTaskList(t *testing.T) {
 
 	// Успешное получение списка
 	t.Run("Success", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks?padding=2", nil)
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks?offset=2", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -349,6 +350,214 @@ func TestPredicTask(t *testing.T) {
 		assert.Zero(t, predictedTask.PredictedTime)
 		assert.False(t, predictedTask.Predicted)
 	})
+}
+
+func TestPredictTask_WithCompletedTasks(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user, token := doSignUpFakeUser(t, ts, user)
+
+	start := 10.0
+	add := 5.0
+
+	for range 10 {
+
+		task := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: start,
+			ActualTime:  start + mathrand.Float64()*5.0,
+			Tags: []int32{
+				mathrand.Int31n(100),
+				mathrand.Int31n(100),
+				mathrand.Int31n(100),
+			},
+		}
+		createTask(t, ts, token, task)
+		start += add
+	}
+
+	task := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: 10.0 * ProbablyNormalTaskTime(3),
+		Tags:        GetRandTags(3, 100),
+	}
+	taskID := createTask(t, ts, token, task)
+
+	t.Run("Success", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/"+strconv.FormatInt(taskID, 10)+"/predict", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var predictedTask entities.PredictedTask
+		json.NewDecoder(resp.Body).Decode(&predictedTask)
+		assert.Equal(t, task.Description, predictedTask.Task.Description)
+		assert.Equal(t, task.Title, predictedTask.Task.Title)
+		assert.NotZero(t, predictedTask.PredictedTime)
+		assert.True(t, predictedTask.Predicted)
+	})
+}
+
+func TestPredictTask_WithCompletedTasksButUncreated(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user, token := doSignUpFakeUser(t, ts, user)
+
+	start := 10.0
+	add := 5.0
+
+	for range 10 {
+		task := models.Task{
+			Title:       gofakeit.JobTitle(),
+			Description: gofakeit.JobDescriptor(),
+			PlannedTime: start,
+			ActualTime:  start + mathrand.Float64()*5.0,
+			Tags: []int32{
+				mathrand.Int31n(100),
+				mathrand.Int31n(100),
+				mathrand.Int31n(100),
+			},
+		}
+		createTask(t, ts, token, task)
+		start += add
+	}
+
+	task := models.Task{
+		Title:       gofakeit.JobTitle(),
+		Description: gofakeit.JobDescriptor(),
+		PlannedTime: 20.0 * ProbablyNormalTaskTime(10),
+		Tags:        GetRandTags(3, 100),
+	}
+	body, _ := json.Marshal(task)
+
+	t.Run("Success", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/predict", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var predictedTime models.PredictedTime
+		json.NewDecoder(resp.Body).Decode(&predictedTime)
+		assert.NotZero(t, predictedTime.PredictedTime)
+	})
+}
+
+func TestPredictGetTags(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user, token := doSignUpFakeUser(t, ts, user)
+
+	req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/tags", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var tags []*models.Tag
+	json.NewDecoder(resp.Body).Decode(&tags)
+
+	assert.Len(t, tags, 100)
+}
+
+func TestPredictPredictTags(t *testing.T) {
+	ts := suite.New(t)
+
+	user := models.User{
+		Username: gofakeit.Username(),
+		Password: getSomePassword(),
+	}
+	user, token := doSignUpFakeUser(t, ts, user)
+
+	task := models.Task{
+		Title:       "Fix user profile page",
+		Description: "Rewrite our python untyped backend view, which calculate user bonus amount, maybe fix celery, maybe it broke crontab",
+	}
+
+	body, _ := json.Marshal(task)
+	req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/tags/predict", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var tags []*models.Tag
+	json.NewDecoder(resp.Body).Decode(&tags)
+
+	assert.Len(t, tags, 10)
+
+	collected := make(map[string]struct{}, 10)
+
+	for _, tag := range tags {
+		collected[tag.Name] = struct{}{}
+	}
+	assert.Len(t, collected, 10)
+
+	count := 0
+	for tag := range collected {
+		switch tag {
+		case "python":
+			count++
+		case "django":
+			count++
+		case "javascript":
+			count++
+		case "html":
+			count++
+		case "r":
+			count++
+		case "c#":
+			count++
+		case "java":
+			count++
+		case "numpy":
+			count++
+		case "php":
+			count++
+		case "regex":
+			count++
+		}
+	}
+	assert.Equal(t, 10, count)
+}
+
+func ProbablyNormalTaskTime(threshold float64) float64 {
+	return mathrand.Float64() * threshold
+}
+
+func GetRandTags(amount, n int32) []int32 {
+	res := make([]int32, amount)
+	for i := range amount {
+		res[i] = mathrand.Int31n(n)
+	}
+	return res
 }
 
 func createTask(t *testing.T, ts *suite.Suite, token string, task models.Task) int64 {
