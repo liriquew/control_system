@@ -25,7 +25,11 @@ type TaskRepository struct {
 	db *sqlx.DB
 }
 
-const listTasksBatchSize = 10
+const (
+	listTasksBatchSize  = 10
+	taskUpdateOperation = "update"
+	taskDeleteOperation = "delete"
+)
 
 func NewTaskRepository(cfg config.StorageConfig) (*TaskRepository, error) {
 	const op = "storage.postgres.New"
@@ -75,14 +79,18 @@ func (s *TaskRepository) SaveTask(ctx context.Context, task *tsks_pb.Task) (int6
 		return 0, err
 	}
 
-	if task.GroupID == 0 {
-		err = txn.Commit()
-		return task.ID, err
+	if task.GroupID != 0 {
+		query = "INSERT INTO tasks_groups (task_id, group_id, assigned_to) VALUES ($1, $2, $3)"
+		if _, err := txn.Exec(query, task.ID, task.GroupID, task.AssignedTo); err != nil {
+			return 0, err
+		}
 	}
 
-	query = "INSERT INTO tasks_groups (task_id, group_id, assigned_to) VALUES ($1, $2, $3)"
-	if _, err := txn.Exec(query, task.ID, task.GroupID, task.AssignedTo); err != nil {
-		return 0, err
+	if task.ActualTime != 0 {
+		query := "INSERT INTO outbox (task_id, op) VALUES ($1, $2)"
+		if _, err := txn.ExecContext(ctx, query, task.ID, taskUpdateOperation); err != nil {
+			return 0, err
+		}
 	}
 
 	if err := txn.Commit(); err != nil {
@@ -185,14 +193,33 @@ func (s *TaskRepository) UpdateTask(ctx context.Context, task *tsks_pb.Task) err
 
 	query = fmt.Sprintf(query, strings.Join(fields, ", "))
 
+	txn, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		txn.Rollback()
+	}()
+
 	if len(fields) != 0 {
-		err := s.db.QueryRowContext(ctx, query, args...).Scan(&task.ID)
+		err := txn.QueryRowContext(ctx, query, args...).Scan(&task.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
 			}
 			return err
 		}
+	}
+
+	if task.ActualTime != 0 {
+		query := "INSERT INTO outbox (task_id, op) VALUES ($1, $2)"
+		if _, err := txn.Exec(query, task.ID, taskUpdateOperation); err != nil {
+			return err
+		}
+	}
+
+	if err := txn.Commit(); err != nil {
+		return err
 	}
 
 	return nil
@@ -264,6 +291,13 @@ func (s *TaskRepository) UpdateGroupTask(ctx context.Context, task *tsks_pb.Task
 		}
 	}
 
+	if task.ActualTime != 0 {
+		query := "INSERT INTO outbox (task_id, op) VALUES ($1, $2)"
+		if _, err := txn.Exec(query, task.ID, taskUpdateOperation); err != nil {
+			return err
+		}
+	}
+
 	if err := txn.Commit(); err != nil {
 		return err
 	}
@@ -276,9 +310,25 @@ func (s *TaskRepository) DeleteUserTask(ctx context.Context, userID, taskID int6
 	DELETE FROM tasks 
 	WHERE id=$1 AND created_by=$2`
 
-	_, err := s.db.ExecContext(ctx, query, taskID, userID)
+	txn, err := s.db.Begin()
 	if err != nil {
+		return err
+	}
+	defer func() {
+		txn.Rollback()
+	}()
+
+	if _, err := s.db.ExecContext(ctx, query, taskID, userID); err != nil {
 		return fmt.Errorf("error executing delete query: %w", err)
+	}
+
+	query = "INSERT INTO outbox (task_id, op) VALUES ($1, $2)"
+	if _, err := txn.Exec(query, taskID, taskDeleteOperation); err != nil {
+		return err
+	}
+
+	if err := txn.Commit(); err != nil {
+		return err
 	}
 
 	return nil
@@ -287,9 +337,25 @@ func (s *TaskRepository) DeleteUserTask(ctx context.Context, userID, taskID int6
 func (s *TaskRepository) DeleteGroupTask(ctx context.Context, taskID int64) error {
 	query := `DELETE FROM tasks WHERE id=$1`
 
-	_, err := s.db.ExecContext(ctx, query, taskID)
+	txn, err := s.db.Begin()
 	if err != nil {
+		return err
+	}
+	defer func() {
+		txn.Rollback()
+	}()
+
+	if _, err := s.db.ExecContext(ctx, query, taskID); err != nil {
 		return fmt.Errorf("error executing delete query: %w", err)
+	}
+
+	query = "INSERT INTO outbox (task_id, op) VALUES ($1, $2)"
+	if _, err := txn.Exec(query, taskID, taskDeleteOperation); err != nil {
+		return err
+	}
+
+	if err := txn.Commit(); err != nil {
+		return err
 	}
 
 	return nil
@@ -343,4 +409,60 @@ func (s *TaskRepository) GetTasks(ctx context.Context, tasksIDs []int64) ([]*mod
 	}
 
 	return tasks, nil
+}
+
+// outbox methods
+func (s *TaskRepository) GetTasksToProduce(ctx context.Context) ([]*models.TaskPredictionData, error) {
+	const op = "tasks_repository.TaskRepository.GetTasksToProduce"
+	query := `
+		SELECT
+			ob.id AS outbox_id,
+			t.id, t.planned_time, t.actual_time, t.tags,
+			CASE
+				WHEN tg.group_id is not null THEN tg.assigned_to 
+				ELSE t.created_by 
+			END AS user_id
+		FROM tasks t
+		JOIN outbox ob ON t.id = ob.task_id
+		LEFT JOIN tasks_groups tg ON t.id = tg.task_id
+		WHERE ob.op='update' AND not ob.processed
+	`
+
+	var tasksPredictionData []*models.TaskPredictionData
+	if err := s.db.SelectContext(ctx, &tasksPredictionData, query); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return tasksPredictionData, nil
+}
+
+func (s *TaskRepository) GetTasksToDelete(ctx context.Context) ([]models.TaskPredictionData, error) {
+	const op = "tasks_repository.TaskRepository.GetTasksToDelete"
+	query := `
+		SELECT t.id, ob.id as outbox_id
+		FROM tasks t
+		JOIN outbox ob ON t.id = ob.task_id
+		LEFT JOIN tasks_groups tg ON t.id = tg.task_id
+		WHERE ob.op='delete' AND not ob.processed
+	`
+
+	var tasksIds []models.TaskPredictionData
+	if err := s.db.SelectContext(ctx, &tasksIds, query); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return tasksIds, nil
+}
+
+func (s *TaskRepository) MarkOutbox(ctx context.Context, outboxIDs []int64) error {
+	const op = "tasks_repository.TaskRepository.GetTasksToDelete"
+	query := `
+		UPDATE outbox SET processed=true WHERE id=ANY($1)
+	`
+
+	if _, err := s.db.ExecContext(ctx, query, pq.Array(outboxIDs)); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }

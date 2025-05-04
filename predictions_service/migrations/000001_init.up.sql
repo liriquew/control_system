@@ -8,16 +8,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     tags integer[]
 );
 
--- m2m
-CREATE TABLE IF NOT EXISTS tasks_tags (
-    task_id BIGINT NOT NULL,
-    tag_id BIGINT NOT NULL,
-    tag varchar(20) NOT NULL,
-
-    CONSTRAINT pk_tasks_tags PRIMARY KEY (task_id, tag_id),  
-    CONSTRAINT fk_tag_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
-);
-
 ------------------------------------------------------------------------ Models Table
 
 CREATE TABLE IF NOT EXISTS models (

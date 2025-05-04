@@ -36,18 +36,12 @@ type tasksRepository interface {
 	GetTasks(ctx context.Context, taskIDs []int64) ([]*models.Task, error)
 }
 
-type tasksProducer interface {
-	ProduceTaskPredictionData(context.Context, *models.TaskPredictionData) error
-	ProduceTaskPredictionDataDelete(context.Context, int64) error
-}
-
 type serverAPI struct {
 	tsks_pb.UnimplementedTasksServer
 	authClient *authclient.AuthClient
 	prdtClient *predictionsclient.PredicionsClient
 	grphClient *grphclient.GraphClient
 	repository tasksRepository
-	producer   tasksProducer
 	log        *slog.Logger
 }
 
@@ -57,7 +51,6 @@ func Register(gRPC *grpc.Server, taskServiceAPI tsks_pb.TasksServer) {
 
 func NewServerAPI(log *slog.Logger,
 	taskRepository tasksRepository,
-	producer tasksProducer,
 	authClient *authclient.AuthClient,
 	prdtClient *predictionsclient.PredicionsClient,
 	grphClient *grphclient.GraphClient,
@@ -65,7 +58,6 @@ func NewServerAPI(log *slog.Logger,
 	return &serverAPI{
 		log:        log,
 		repository: taskRepository,
-		producer:   producer,
 		authClient: authClient,
 		prdtClient: prdtClient,
 		grphClient: grphClient,
@@ -112,14 +104,6 @@ func (s *serverAPI) CreateTask(ctx context.Context, task *tsks_pb.Task) (*tsks_p
 	if err != nil {
 		s.log.Error("error while saving task", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
-	}
-
-	if task.ActualTime != 0 {
-		err = s.producer.ProduceTaskPredictionData(ctx, models.GetPredictionData(task))
-		if err != nil {
-			s.log.Error("error while producing task", sl.Err(err))
-			return nil, status.Error(codes.Internal, "internal")
-		}
 	}
 
 	return &tsks_pb.TaskID{ID: task.ID}, nil
@@ -219,18 +203,6 @@ func (s *serverAPI) UpdateTask(ctx context.Context, task *tsks_pb.Task) (*emptyp
 		return nil, err
 	}
 
-	// produce message if task complete, or completed time changed
-	if task.ActualTime != 0 {
-		err = s.producer.ProduceTaskPredictionData(ctx, models.CombineTasksToPredictionData(
-			taskFromDB,
-			task,
-		))
-		if err != nil {
-			s.log.Error("error while producing task", sl.Err(err))
-			return nil, status.Error(codes.Internal, "internal")
-		}
-	}
-
 	return &emptypb.Empty{}, nil
 }
 
@@ -242,7 +214,7 @@ func (s *serverAPI) DeleteTask(ctx context.Context, taskID *tsks_pb.TaskID) (*em
 	}
 
 	// get task
-	taskToDelete, err := s.repository.GetTaskByID(ctx, taskID.ID)
+	_, err = s.repository.GetTaskByID(ctx, taskID.ID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return &emptypb.Empty{}, nil
@@ -252,9 +224,7 @@ func (s *serverAPI) DeleteTask(ctx context.Context, taskID *tsks_pb.TaskID) (*em
 		return nil, status.Error(codes.Internal, "internal")
 	}
 
-	// delete task
 	if taskID.GroupID != 0 {
-		// authenticated in gateway
 		err = s.repository.DeleteGroupTask(ctx, taskID.ID)
 	} else {
 		err = s.repository.DeleteUserTask(ctx, userID, taskID.ID)
@@ -265,21 +235,6 @@ func (s *serverAPI) DeleteTask(ctx context.Context, taskID *tsks_pb.TaskID) (*em
 		}
 
 		s.log.Error("error while deleting task", sl.Err(err))
-		return nil, status.Error(codes.Internal, "internal")
-	}
-
-	// produce message to predictions service
-	// and save task, in case if produce failed
-	err = s.producer.ProduceTaskPredictionDataDelete(ctx, taskID.ID)
-	if err != nil {
-		s.log.Error("error while produce task data delete message", sl.Err(err))
-		_, err := s.repository.SaveTask(ctx, models.ConvertModelToProto(taskToDelete))
-		if err != nil {
-			s.log.Error("error while saving task", sl.Err(err))
-			return nil, status.Error(codes.Internal, "internal")
-		}
-
-		s.log.Error("error while saving deleted task", sl.Err(err))
 		return nil, status.Error(codes.Internal, "internal")
 	}
 

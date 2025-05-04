@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/liriquew/control_system/internal/entities"
 	"github.com/liriquew/control_system/internal/models"
@@ -390,6 +391,9 @@ func TestPredictTask_WithCompletedTasks(t *testing.T) {
 	taskID := createTask(t, ts, token, task)
 
 	t.Run("Success", func(t *testing.T) {
+		// API -> tasks -> outbox table -> worker -> kafka -> predictions_service consumer -> predictions_service db
+		// create -> get
+		time.Sleep(200 * time.Millisecond)
 		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/"+strconv.FormatInt(taskID, 10)+"/predict", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -445,6 +449,7 @@ func TestPredictTask_WithCompletedTasksButUncreated(t *testing.T) {
 	body, _ := json.Marshal(task)
 
 	t.Run("Success", func(t *testing.T) {
+		time.Sleep(200 * time.Millisecond)
 		req, _ := http.NewRequest("GET", ts.GetURL()+"/api/tasks/predict", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 

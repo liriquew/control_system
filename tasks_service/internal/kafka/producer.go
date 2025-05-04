@@ -25,20 +25,20 @@ func NewProducer(log *slog.Logger, cfg config.KafkaTasksTopicConfig) (*ProducerW
 		Topic:         cfg.Topic,
 		Balancer:      &kafka.LeastBytes{},
 		RequiredAcks:  1,
-		BatchSize:     1000,                   // Увеличить размер батча
-		BatchTimeout:  100 * time.Millisecond, // Чаще отправлять батчи
-		QueueCapacity: 10000,                  // Увеличить размер очереди
-		MaxAttempts:   2,                      // Уменьшить число попыток
+		BatchSize:     1000,
+		BatchTimeout:  100 * time.Millisecond,
+		QueueCapacity: 10000,
+		MaxAttempts:   2,
 	})
 	deleteWriter := kafka.NewWriter(kafka.WriterConfig{
 		Brokers:       []string{cfg.ConnStr},
 		Topic:         cfg.DeleteTopic,
 		Balancer:      &kafka.LeastBytes{},
 		RequiredAcks:  1,
-		BatchSize:     1000,                   // Увеличить размер батча
-		BatchTimeout:  100 * time.Millisecond, // Чаще отправлять батчи
-		QueueCapacity: 10000,                  // Увеличить размер очереди
-		MaxAttempts:   2,                      // Уменьшить число попыток
+		BatchSize:     1000,
+		BatchTimeout:  100 * time.Millisecond,
+		QueueCapacity: 10000,
+		MaxAttempts:   2,
 	})
 
 	return &ProducerWrapper{
@@ -56,48 +56,42 @@ func (p *ProducerWrapper) Close() error {
 	return nil
 }
 
-func (p *ProducerWrapper) ProduceTaskPredictionData(ctx context.Context, task *models.TaskPredictionData) error {
-	message, err := json.Marshal(task)
-	if err != nil {
-		p.log.Error("failed to marshal task", sl.Err(err))
-		return fmt.Errorf("marshal task: %w", err)
-	}
-
-	err = p.w.WriteMessages(ctx,
-		kafka.Message{
+func (p *ProducerWrapper) ProduceTask(ctx context.Context, tasks []*models.TaskPredictionData) error {
+	messages := make([]kafka.Message, len(tasks))
+	for i, task := range tasks {
+		message, _ := json.Marshal(task)
+		p.log.Debug("task to sent", slog.Any("task", task))
+		messages[i] = kafka.Message{
 			Key:   convertInt64ByteArr(task.ID),
 			Value: message,
-		},
-	)
+		}
+	}
+	err := p.w.WriteMessages(ctx, messages...)
 	if err != nil {
 		p.log.Error("failed to send task to Kafka", sl.Err(err))
 		return fmt.Errorf("write message: %w", err)
 	}
+	// p.log.Debug("create tasks messages was sent")
 
-	p.log.Debug("task sent to Kafka", slog.Int64("task_id", task.ID))
 	return nil
 }
 
-func (p *ProducerWrapper) ProduceTaskPredictionDataDelete(ctx context.Context, taskID int64) error {
-	message, err := json.Marshal(&models.TaskPredictionData{
-		ID: taskID,
-	})
-	if err != nil {
-		p.log.Error("failed to marshal task", sl.Err(err))
-		return fmt.Errorf("marshal task: %w", err)
+func (p *ProducerWrapper) ProduceTaskDelete(ctx context.Context, tasksIds []int64) error {
+	messages := make([]kafka.Message, len(tasksIds))
+	for i, taskId := range tasksIds {
+		message, _ := json.Marshal(models.Task{ID: taskId})
+		messages[i] = kafka.Message{
+			Key:   convertInt64ByteArr(taskId),
+			Value: message,
+		}
 	}
 
-	err = p.deleteW.WriteMessages(ctx,
-		kafka.Message{
-			Key:   convertInt64ByteArr(taskID),
-			Value: message,
-		},
-	)
+	err := p.deleteW.WriteMessages(ctx, messages...)
 	if err != nil {
 		p.log.Error("failed to send task to Kafka", sl.Err(err))
 		return fmt.Errorf("write message: %w", err)
 	}
+	// p.log.Debug("delete messages was sent")
 
-	p.log.Debug("task sent to Kafka", slog.Int64("task_id", taskID))
 	return nil
 }

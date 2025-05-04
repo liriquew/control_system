@@ -74,25 +74,11 @@ func addPriorityDependencies(graph graph_tools_interface.GraphWithNodes, nodesVa
 }
 
 func getLastNodes(adjacencyList map[int64][]int64) []int64 {
-	visited := make(map[int64]struct{}, len(adjacencyList))
 	res := []int64{}
 
-	var dfs func(int64)
-	dfs = func(node int64) {
-		if len(adjacencyList[node]) == 0 {
+	for node, deps := range adjacencyList {
+		if len(deps) == 0 {
 			res = append(res, node)
-		}
-
-		for _, v := range adjacencyList[node] {
-			if _, ok := visited[node]; ok {
-				dfs(v)
-			}
-		}
-	}
-
-	for node := range adjacencyList {
-		if _, ok := visited[node]; !ok {
-			dfs(node)
 		}
 	}
 
@@ -120,10 +106,6 @@ func FindCriticalPath(graph graph_tools_interface.GraphWithNodes, nodesValueMap 
 			adjacencyListInversed[node.GetID()] = []int64{}
 		}
 		for _, depNode := range adjacencyList[node.GetID()] {
-			if _, ok := adjacencyListInversed[depNode]; !ok {
-				adjacencyListInversed[depNode] = []int64{}
-			}
-
 			adjacencyListInversed[depNode] = append(adjacencyListInversed[depNode], node.GetID())
 		}
 

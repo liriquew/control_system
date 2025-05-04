@@ -10,16 +10,16 @@ import (
 )
 
 type Task struct {
-	ID          int64         `db:"id" json:"ID,omitempty"`
-	CreatedBy   int64         `db:"created_by" json:"CreatedBy,omitempty"`
+	ID          int64         `db:"id" json:"id,omitempty"`
+	CreatedBy   int64         `db:"created_by" json:"user_id,omitempty"`
 	AssignedTo  sql.NullInt64 `db:"assigned_to"`
-	GroupID     sql.NullInt64 `db:"group_id" json:"GroupID,omitempty"`
-	Title       string        `db:"title" json:"Title,omitempty"`
-	Description string        `db:"description" json:"Description,omitempty"`
-	Tags        pq.Int32Array `db:"tags" json:"Tags,omitempty"`
-	PlannedTime float64       `db:"planned_time" json:"PlannedTime,omitempty"`
-	ActualTime  float64       `db:"actual_time" json:"ActualTime,omitempty"`
-	CreatedAt   time.Time     `db:"created_at" json:"CreatedAt,omitempty"`
+	GroupID     sql.NullInt64 `db:"group_id"`
+	Title       string        `db:"title" json:"title,omitempty"`
+	Description string        `db:"description" json:"description,omitempty"`
+	Tags        pq.Int32Array `db:"tags" json:"tags,omitempty"`
+	PlannedTime float64       `db:"planned_time" json:"planned_time,omitempty"`
+	ActualTime  float64       `db:"actual_time" json:"actual_time,omitempty"`
+	CreatedAt   time.Time     `db:"created_at"`
 }
 
 func ConvertModelToProto(task *Task) *tsks_pb.Task {
@@ -38,11 +38,29 @@ func ConvertModelToProto(task *Task) *tsks_pb.Task {
 }
 
 type TaskPredictionData struct {
-	ID          int64   `json:"id,omitempty"`
-	UserID      int64   `json:"user_id,omitempty"`
-	PlannedTime float64 `json:"planned_time,omitempty"`
-	ActualTime  float64 `json:"actual_time,omitempty"`
-	Tags        []int32 `json:"tags,omitempty"`
+	OutboxID    int64         `db:"outbox_id"`
+	ID          int64         `db:"id" json:"id,omitempty"`
+	UserID      int64         `db:"user_id" json:"user_id,omitempty"`
+	PlannedTime float64       `db:"planned_time" json:"planned_time,omitempty"`
+	ActualTime  float64       `db:"actual_time" json:"actual_time,omitempty"`
+	Tags        pq.Int32Array `db:"tags" json:"tags,omitempty"`
+}
+
+func ExtractPredictionData(task *Task) *TaskPredictionData {
+	res := &TaskPredictionData{
+		ID:          task.ID,
+		PlannedTime: task.PlannedTime,
+		ActualTime:  task.ActualTime,
+		Tags:        task.Tags,
+	}
+
+	if task.GroupID.Int64 != 0 {
+		res.UserID = task.AssignedTo.Int64
+	} else {
+		res.UserID = task.CreatedBy
+	}
+
+	return res
 }
 
 func GetPredictionData(task *tsks_pb.Task) *TaskPredictionData {

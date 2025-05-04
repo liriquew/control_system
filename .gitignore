@@ -6,3 +6,9 @@ predictions_service/classifier_model/processed_dataset
 predictions_service/classifier_model/venv
 
 .VSCodeCounter
+
+auth_service/auth_service
+graphs_service/graphs_service
+groups_service/groups_service
+tasks_service/tasks_service
+api/api

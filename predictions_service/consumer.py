@@ -52,7 +52,7 @@ class KafkaMLConsumer:
         
         try:
             while True:
-                msg = self._consumer.poll(0.01)
+                msg = self._consumer.poll(0.001)
                 
                 if msg is None:
                     continue
@@ -78,7 +78,7 @@ class KafkaMLConsumer:
         
         try:
             while True:
-                msg = self._consumer_delete.poll(0.01)
+                msg = self._consumer_delete.poll(0.001)
                 
                 if msg is None:
                     continue

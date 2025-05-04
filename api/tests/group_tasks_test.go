@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/liriquew/control_system/internal/models"
@@ -520,6 +521,7 @@ func TestPredictUncreatedTask(t *testing.T) {
 	body, _ = json.Marshal(task)
 
 	t.Run("Success", func(t *testing.T) {
+		time.Sleep(1000 * time.Millisecond)
 		req, _ := http.NewRequest("GET",
 			fmt.Sprintf("%s/api/groups/%d/tasks/predict/%d", ts.GetURL(), groupID, user2.ID),
 			bytes.NewBuffer(body),

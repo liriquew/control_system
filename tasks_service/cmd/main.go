@@ -24,6 +24,10 @@ func main() {
 		application.GRPCServer.MustRun()
 	}()
 
+	go func() {
+		application.OutboxMachine.MustRun()
+	}()
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
