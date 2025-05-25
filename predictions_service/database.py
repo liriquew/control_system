@@ -135,7 +135,7 @@ class Database():
         finally:
             cursor.close()
 
-    
+    # consumer method
     def save_task_prediction_data(self, prediction_data: PredictInfo):
         """
         kafka consumer method
@@ -162,6 +162,7 @@ class Database():
             cursor.close()
 
 
+    # consumer method
     def delete_task_prediction_data(self, task_id: int):
         """
         kafka consumer method

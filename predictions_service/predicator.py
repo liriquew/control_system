@@ -93,7 +93,6 @@ class TagsPredicator:
     def __init__(self, config: dict[str, str]):
         self.classifacator = load_model(config["classificator_path"])
         self.vectorizer_body: TfidfVectorizer = joblib.load(config["body_vectorizer"])
-        self.vectorizer_title: TfidfVectorizer = joblib.load(config["title_vectorizer"])
         self.binarizer_tags: MultiLabelBinarizer = joblib.load(config["tags_vectorizer"])
 
 
@@ -111,21 +110,20 @@ class TagsPredicator:
         return res
 
 
-    def predict(self, title: str, body: str) -> list[Tag]:
+    def predict(self, body: str) -> list[Tag]:
         """
         make tags predict, returns (tags, tags ids)
         """
-        body_vect = self.vectorizer_body.transform([title])
-        title_vect = self.vectorizer_title.transform([body])
+        model_input = self.vectorizer_body.transform([body])
 
-
-        model_input = hstack([body_vect, title_vect]).toarray()
+        model_input = hstack([model_input]).toarray()
         tags_predict = self.classifacator.predict(model_input)[0]
         recent_tags = self.get_top_ten(tags_predict)
 
         tags = self.binarizer_tags.classes_[[t for t, _ in recent_tags]]
 
         predictions = []
+        print("LOG:")
         for tag_name, (id, probability) in zip(tags, recent_tags):
             predictions.append(Tag(
                 id=id,

@@ -110,11 +110,11 @@ class PredictionService():
         return predict_info, list(unpredicted_uids)
     
 
-    def predict_tags(self, title: str, description: str) -> list[predicator.Tag]:
+    def predict_tags(self, description: str) -> list[predicator.Tag]:
         """
         Предсказывает теги по заголовку и описанию задачи
         """
-        tags = self.tag_predicator.predict(title, description)
+        tags = self.tag_predicator.predict(description)
 
         return tags
     

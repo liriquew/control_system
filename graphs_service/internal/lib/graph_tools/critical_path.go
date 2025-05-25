@@ -43,7 +43,8 @@ var lessFuncMap map[int]less
 func init() {
 	lessFuncMap = make(map[int]less)
 	lessFuncMap[1] = func(n1, n2 graph_tools_interface.Node) bool {
-		return n1.GetID() < n2.GetID()
+		fmt.Println(n1.GetID(), n1.GetWeight(), n2.GetID(), n2.GetWeight())
+		return n1.GetWeight() < n2.GetWeight()
 	}
 }
 
@@ -61,7 +62,7 @@ func addPriorityDependencies(graph graph_tools_interface.GraphWithNodes, nodesVa
 	for _, tasks := range workerTasks {
 		// Сортировка по приоритету (здесь — по длительности)
 		sort.SliceStable(tasks, func(i, j int) bool {
-			return lf(tasks[i], tasks[i])
+			return lf(tasks[i], tasks[j])
 		})
 
 		// Добавляем рёбра между последовательными задачами
@@ -130,6 +131,7 @@ func FindCriticalPath(graph graph_tools_interface.GraphWithNodes, nodesValueMap 
 		max:  math.SmallestNonzeroFloat64,
 	}
 	adjacencyList[dummyNodeID] = []int64{}
+	fmt.Println("LAST NODES:", lastNodes)
 	adjacencyListInversed[dummyNodeID] = lastNodes
 	nodesValueMap[dummyNodeID] = 0.0
 
@@ -250,9 +252,9 @@ func FindCriticalPath(graph graph_tools_interface.GraphWithNodes, nodesValueMap 
 	var dfs func(int64, []int64)
 	dfs = func(node int64, curr []int64) {
 		if amount := nodeAmountMap[node]; amount.max == 0 && amount.min == amount.max {
-			slices.Reverse(curr)
 			path := make([]int64, len(curr))
 			copy(path, curr)
+			slices.Reverse(path)
 			res = append(res, path)
 			return
 		}

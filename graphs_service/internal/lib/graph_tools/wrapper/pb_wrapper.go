@@ -29,6 +29,13 @@ func (wn *WrappedNode) GetID() int64 {
 	return wn.Node.Node.ID
 }
 
+func (wn *WrappedNode) GetWeight() float64 {
+	if wn.Node.PredictedTime == 0 {
+		return wn.Node.Task.PlannedTime
+	}
+	return wn.Node.PredictedTime
+}
+
 func (wn *WrappedNode) GetAssignedTo() int64 {
 	return wn.Node.Task.AssignedTo
 }

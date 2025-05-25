@@ -46,11 +46,16 @@ type Node struct {
 	TaskID                 int64   `json:"task_id" db:"task_id"`
 	AssignedTo             *int64  `json:"assigned_to" db:"assigned_to"`
 	DependencyNodeIDs      []int64 `json:"dependencies"`
+	Weight                 float64
 	AdditionalDependencies []int64
 }
 
 func (n *Node) GetDependencies() []int64 {
 	return n.DependencyNodeIDs
+}
+
+func (n *Node) GetWeight() float64 {
+	return n.Weight
 }
 
 func (n *Node) GetID() int64 {

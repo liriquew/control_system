@@ -15,5 +15,4 @@ kafka:
 tag_classificator:
   classificator_path: "./models/classificator.keras"
   body_vectorizer: "./models/vectorizers/BodyVectorizer.pickle"
-  title_vectorizer: "./models/vectorizers/TitleVectorizer.pickle"
   tags_vectorizer: "./models/vectorizers/TagsVectorizer.pickle"

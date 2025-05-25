@@ -23,6 +23,5 @@ CREATE TABLE IF NOT EXISTS outbox (
     op VARCHAR(6) NOT NULL,
     processed BOOLEAN DEFAULT false,
 
-    CONSTRAINT fk_task_outbox FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
     CHECK (op IN ('delete', 'update'))
 )

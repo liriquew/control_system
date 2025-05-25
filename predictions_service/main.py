@@ -92,7 +92,7 @@ class PredictionsServer(pb2_grpc.PredictionsServicer):
         print("PredictTags")
         try:
             print(MessageToDict(request))
-            tags = self.service.predict_tags(request.Title, request.Description)
+            tags = self.service.predict_tags(request.Description)
             tags = [tag.toPb() for tag in tags]
         except Exception as e:
             self._handle_exception(context, e)

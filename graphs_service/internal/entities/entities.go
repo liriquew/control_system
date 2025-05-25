@@ -33,6 +33,10 @@ func (nt *NodeWithTask) GetID() int64 {
 	return nt.Node.ID
 }
 
+func (nt *NodeWithTask) GetWeight() float64 {
+	return nt.Node.Weight
+}
+
 func (nt *NodeWithTask) GetAssignedTo() int64 {
 	return *nt.Node.AssignedTo
 }

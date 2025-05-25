@@ -55,16 +55,16 @@ func TestHasCycle(t *testing.T) {
 		{
 			name: "Big graph with cycle",
 
-			//       1 <-----
-			//      / \		|
-			//     2   4	|
-			//     | \ |	|
-			//     3 > 5	|
-			//      \ /		|
-			// 		 6 ------
+			//	---> 1
+			//  |   / \
+			//  |  2   4
+			//  |  | \ |
+			//  -- 3 > 5
+			//      \ /
+			// 		 6
 			graph: &entities.GraphWithNodes{
 				Nodes: []*models.Node{
-					{ID: 1, DependencyNodeIDs: []int64{6}},
+					{ID: 1, DependencyNodeIDs: []int64{3}},
 					{ID: 2, DependencyNodeIDs: []int64{1}},
 					{ID: 4, DependencyNodeIDs: []int64{1}},
 					{ID: 3, DependencyNodeIDs: []int64{2}},

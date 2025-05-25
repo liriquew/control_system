@@ -1,0 +1,320 @@
+{
+	"info": {
+		"_postman_id": "ac28685b-a3e1-4ccb-97c2-d160e830a3d4",
+		"name": "API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "26311538"
+	},
+	"item": [
+		{
+			"name": "Авторизация",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQxNDM5OTYsImlhdCI6MTczNDEwMDc5NiwidWlkIjowfQ.p5jA9yEAHU4JFBl1cRKxr6P9gCp8wmw2J_9iP_PrP4E",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"user\",\n    \"password\": \"passw0rd\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/api/signin",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"signin"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Регистрация",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"some_user3\",\n    \"password\": \"passw0rd\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/api/signup",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"signup"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Создание задачи",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQzMTQ0MjUsImlhdCI6MTczNDI3MTIyNSwidWlkIjoxM30.p4vBlXLuxtCA7U_aWgh4Zc2ocTTQE51CmQqX1KQfNCQ",
+						"description": "jwt-Токен",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"title\": \"Заголовок\",\n  \"description\": \"Описание\",\n  \"planned_time\": 5\n}\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/api/task",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"task"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Запрос задачи",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQzMTQ0MjUsImlhdCI6MTczNDI3MTIyNSwidWlkIjoxM30.p4vBlXLuxtCA7U_aWgh4Zc2ocTTQE51CmQqX1KQfNCQ",
+						"description": "jwt-Токен",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:8080/api/task/?taskid=19",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"task",
+						""
+					],
+					"query": [
+						{
+							"key": "taskid",
+							"value": "19"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Изменение задачи",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQzMTY0NjMsImlhdCI6MTczNDI3MzI2MywidWlkIjoxfQ.dBvOJwevC4Kx8O8Al0gELG8oulA44xsstj4sLOgq8IY",
+						"description": "jwt-Токен",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Новый заголовок\",\n    \"description\": \"Новое описание\",\n    \"planned_time\": 3\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/api/task/?taskid=11",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"task",
+						""
+					],
+					"query": [
+						{
+							"key": "taskid",
+							"value": "11"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Завершение задачи",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQzMTY0NjMsImlhdCI6MTczNDI3MzI2MywidWlkIjoxfQ.dBvOJwevC4Kx8O8Al0gELG8oulA44xsstj4sLOgq8IY",
+						"description": "jwt-Токен",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Новый заголовок\",\n    \"description\": \"Новое описание\",\n    \"actual_time\": 9.8\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/api/task/?taskid=10",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"task",
+						""
+					],
+					"query": [
+						{
+							"key": "taskid",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Удаление задачи",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQzMTQ0MjUsImlhdCI6MTczNDI3MTIyNSwidWlkIjoxM30.p4vBlXLuxtCA7U_aWgh4Zc2ocTTQE51CmQqX1KQfNCQ",
+						"description": "jwt-Токен",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:8080/api/task/?taskid=21",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"task",
+						""
+					],
+					"query": [
+						{
+							"key": "taskid",
+							"value": "21"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Предсказание",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzQzMTY0NjMsImlhdCI6MTczNDI3MzI2MywidWlkIjoxfQ.dBvOJwevC4Kx8O8Al0gELG8oulA44xsstj4sLOgq8IY",
+						"description": "jwt-Токен",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:8080/api/predict/?planned_time=14",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"predict",
+						""
+					],
+					"query": [
+						{
+							"key": "planned_time",
+							"value": "14"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ping",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
