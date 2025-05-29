@@ -1,21 +1,24 @@
-FROM golang:1.23
+FROM golang:1.24 AS build-stage
 
 WORKDIR /app
 
-COPY . .
+COPY api ./api/
 
-RUN go mod tidy
+# required for build (../ replace in go.mod)
+COPY service_protos ./service_protos/
 
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN cd api && go mod download && cd ..
 
-RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+RUN cd api && CGO_ENABLED=0 GOOS=linux go build -o /api cmd/main.go
 
-RUN go build ./cmd/main.go
+# Run Stage
+FROM alpine:3.19 AS run-stage
 
-ENV PORT=8080
+WORKDIR /
+
+COPY --from=build-stage /api /api
+COPY --from=build-stage /app/api/config/docker_config.yaml /config/docker_config.yaml
 
 EXPOSE 8080
 
-CMD ["./main"]
+ENTRYPOINT ["/api"]

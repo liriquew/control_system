@@ -55,18 +55,16 @@ type serverAPI struct {
 	repository  graphsRepository
 	log         *slog.Logger
 	tasksClient tasksClient
-	authClient  authClient
 }
 
 func Register(gRPC *grpc.Server, taskServiceAPI grph_pb.GraphsServer) {
 	grph_pb.RegisterGraphsServer(gRPC, taskServiceAPI)
 }
 
-func NewServerAPI(log *slog.Logger, graphsRepository graphsRepository, ac authClient, tc tasksClient) *serverAPI {
+func NewServerAPI(log *slog.Logger, graphsRepository graphsRepository, tc tasksClient) *serverAPI {
 	return &serverAPI{
 		log:         log,
 		repository:  graphsRepository,
-		authClient:  ac,
 		tasksClient: tc,
 	}
 }

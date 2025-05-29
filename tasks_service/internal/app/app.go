@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	authclient "github.com/liriquew/tasks_service/internal/grpc/clients/auth_client"
-	grphclient "github.com/liriquew/tasks_service/internal/grpc/clients/graphs_client"
 	predictionsclient "github.com/liriquew/tasks_service/internal/grpc/clients/predictions_client"
 	"github.com/liriquew/tasks_service/internal/kafka"
 	"github.com/liriquew/tasks_service/internal/lib/config"
@@ -35,24 +33,14 @@ func New(log *slog.Logger, cfg config.AppConfig) *App {
 		panic(err)
 	}
 
-	authClient, err := authclient.NewAuthClient(log, cfg.AuthClient)
-	if err != nil {
-		panic(err)
-	}
-
 	prdtClient, err := predictionsclient.NewPredictionsClient(log, cfg.PredictionsClient)
-	if err != nil {
-		panic(err)
-	}
-
-	grphClient, err := grphclient.NewGraphClient(log, cfg.GraphsClient)
 	if err != nil {
 		panic(err)
 	}
 
 	outbox := outbox.New(log, producer, storage)
 
-	tasksService := tasks.NewServerAPI(log, storage, authClient, prdtClient, grphClient)
+	tasksService := tasks.NewServerAPI(log, storage, prdtClient)
 
 	app := grpcapp.New(log, tasksService, cfg.TasksService.Port)
 

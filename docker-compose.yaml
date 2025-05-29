@@ -1,4 +1,116 @@
+version: '3.8'
+
 services:
+  api-gateway:
+    build:
+      context: ./
+      dockerfile: ./api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      CONF_PATH: ./config/docker_config.yaml
+    depends_on:
+      - auth-service
+      - groups-service
+      - tasks-service
+      - graphs-service
+      - predictions-service
+    networks:
+      - app-network
+
+  auth-service:
+    build:
+      context: ./
+      dockerfile: ./auth_service/Dockerfile
+    environment:
+      CONF_PATH: ./config/docker_config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  groups-service:
+    build:
+      context: ./
+      dockerfile: ./groups_service/Dockerfile
+    environment:
+      CONF_PATH: ./config/docker_config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  tasks-service:
+    build:
+      context: ./
+      dockerfile: ./tasks_service/Dockerfile
+    environment:
+      CONF_PATH: ./config/docker_config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      predictions-service:
+        condition: service_started
+    networks:
+      - app-network
+
+  graphs-service:
+    build:
+      context: ./
+      dockerfile: ./graphs_service/Dockerfile
+    environment:
+      CONF_PATH: ./config/docker_config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tasks-service:
+        condition: service_started
+      predictions-service:
+        condition: service_started
+    networks:
+      - app-network
+
+  predictions-service:
+    build:
+      context: ./predictions_service
+      dockerfile: Dockerfile
+    environment:
+      DOCKER_CONFIG: config/docker_config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - app-network
+  
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./auth_service/migrations:/auth_migrations
+      - ./tasks_service/migrations:/tasks_migrations
+      - ./graphs_service/migrations:/graphs_migrations
+      - ./groups_service/migrations:/groups_migrations
+      - ./predictions_service/migrations:/predictions_migrations
+    entrypoint:  
+      - "sh"
+      - "-c" 
+      - |
+        migrate -path auth_migrations -database "postgres://postgres:passw0rd@postgresql_for_system:5432/control_system_auth?sslmode=disable" -verbose up
+        migrate -path tasks_migrations -database "postgres://postgres:passw0rd@postgresql_for_system:5432/control_system_tasks?sslmode=disable" -verbose up
+        migrate -path graphs_migrations -database "postgres://postgres:passw0rd@postgresql_for_system:5432/control_system_graphs?sslmode=disable" -verbose up
+        migrate -path groups_migrations -database "postgresql://postgres:passw0rd@postgresql_for_system:5432/control_system_groups?sslmode=disable" -verbose up
+        migrate -path predictions_migrations -database "postgres://postgres:passw0rd@postgresql_for_system:5432/control_system_predictions?sslmode=disable" -verbose up
+    networks:
+      - app-network
+
   postgres:
     container_name: postgresql_for_system
     image: postgres:latest
@@ -7,10 +119,19 @@ services:
       POSTGRES_PASSWORD: passw0rd
       POSTGRES_DB: control_system_db
       PGDATA: /data/postgres
-
+      POSTGRES_MULTIPLE_DATABASES: control_system_auth,control_system_tasks,control_system_graphs,control_system_groups,control_system_predictions
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     ports:
       - "5432:5432"
-    
+    volumes:
+      - ./scripts/postgres:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+
     restart: unless-stopped
 
   pgadmin:
@@ -32,7 +153,7 @@ services:
       - "5050:80"
 
     restart: unless-stopped
-
+    
   zookeeper:
     restart: always
     container_name: kafka-like-zookeeper
@@ -43,11 +164,13 @@ services:
       - "zookeeper-volume:/bitnami"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - app-network
 
   kafka:
     restart: always
     container_name: kafka-like
-    image: docker.io/bitnami/kafka:3.3
+    image: bitnami/kafka:3.6
     ports:
       - "9093:9093"
       - "9999:9999"  # JMX-порт
@@ -57,6 +180,9 @@ services:
       - KAFKA_BROKER_ID=1
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_NUM_PARTITIONS=1
+      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
@@ -66,6 +192,23 @@ services:
       - KAFKA_CFG_JMX_PORT=9999
     depends_on:
       - zookeeper
+    networks:
+      - app-network
+
+  kafka-init:
+    image: bitnami/kafka:3.6
+    depends_on:
+      kafka:
+        condition: service_started
+    command: >
+      /bin/bash -c "
+        echo 'Creating topics...'
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic predictions --partitions 1 --replication-factor 1
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic predictions_delete --partitions 1 --replication-factor 1
+        echo 'Topics created'
+      "
+    networks:
+      - app-network
 
   kafka-ui:
     restart: always
@@ -79,10 +222,17 @@ services:
       - KAFKA_CLUSTERS_0_NAME=local-kafka
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
       - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    networks:
+      - app-network
     depends_on:
       - kafka
 
 volumes:
+  postgres_data:
   pgadmin:
   kafka-volume:
   zookeeper-volume:
+
+networks:
+  app-network:
+    driver: bridge

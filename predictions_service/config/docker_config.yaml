@@ -1,0 +1,18 @@
+service_config:
+  port: 50052
+  host: predictions-service
+postgres:
+  username: postgres
+  password: passw0rd
+  host: postgres
+  port: 5432
+  db_name: control_system_predictions
+kafka:
+  bootstrap_servers: "kafka:9092"
+  topic: "predictions"
+  group_id: "predictions"
+  delete_topic: "predictions_delete"
+tag_classificator:
+  classificator_path: "./models/classificator.keras"
+  body_vectorizer: "./models/vectorizers/BodyVectorizer.pickle"
+  tags_vectorizer: "./models/vectorizers/TagsVectorizer.pickle"

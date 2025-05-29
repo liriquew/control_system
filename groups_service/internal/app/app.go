@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	authclient "github.com/liriquew/groups_service/internal/grpc/clients/auth_client"
 	"github.com/liriquew/groups_service/internal/lib/config"
 	"github.com/liriquew/groups_service/internal/service/groups"
 	"github.com/liriquew/groups_service/pkg/logger/sl"
@@ -25,12 +24,7 @@ func New(log *slog.Logger, cfg config.AppConfig) *App {
 		panic(err)
 	}
 
-	authClient, err := authclient.NewAuthClient(log, cfg.AuthClient)
-	if err != nil {
-		panic(err)
-	}
-
-	tasksService := groups.NewServerAPI(log, storage, authClient)
+	tasksService := groups.NewServerAPI(log, storage)
 
 	app := grpcapp.New(log, tasksService, cfg.ServiceConfig.Port)
 

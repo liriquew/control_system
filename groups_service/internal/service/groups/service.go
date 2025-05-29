@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	grpc_pb "github.com/liriquew/control_system/services_protos/groups_service"
-	authclient "github.com/liriquew/groups_service/internal/grpc/clients/auth_client"
 	"github.com/liriquew/groups_service/internal/models"
 	repository "github.com/liriquew/groups_service/internal/repository"
 	"github.com/liriquew/groups_service/pkg/logger/sl"
@@ -36,7 +35,6 @@ type GroupsRepository interface {
 
 type serverAPI struct {
 	grpc_pb.UnimplementedGroupsServer
-	authClient *authclient.AuthClient
 	repository GroupsRepository
 	log        *slog.Logger
 }
@@ -45,11 +43,10 @@ func Register(gRPC *grpc.Server, taskServiceAPI grpc_pb.GroupsServer) {
 	grpc_pb.RegisterGroupsServer(gRPC, taskServiceAPI)
 }
 
-func NewServerAPI(log *slog.Logger, taskRepository GroupsRepository, authClient *authclient.AuthClient) *serverAPI {
+func NewServerAPI(log *slog.Logger, taskRepository GroupsRepository) *serverAPI {
 	return &serverAPI{
 		log:        log,
 		repository: taskRepository,
-		authClient: authClient,
 	}
 }
 

@@ -9,9 +9,7 @@ import (
 
 type AppConfig struct {
 	ServiceConfig ServiceConfig `yaml:"service_config" env-required:"true"`
-	AuthClient    ClientConfig  `yaml:"auth_service" env-required:"true"`
 	TasksClient   ClientConfig  `yaml:"tasks_service" env-required:"true"`
-	GroupsClient  ClientConfig  `yaml:"groups_service" env-required:"true"`
 	Storage       StorageConfig `yaml:"postgres" env-required:"true"`
 }
 

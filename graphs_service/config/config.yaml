@@ -1,15 +1,5 @@
 service_config:
   port: 50055
-auth_service:
-  host: localhost
-  port: 50051
-  timeout: 1s
-  retries: 1
-groups_service:
-  host: localhost
-  port: 50053
-  timeout: 1s
-  retries: 1
 tasks_service:
   host: localhost
   port: 50054

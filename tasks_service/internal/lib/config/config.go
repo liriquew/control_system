@@ -9,10 +9,7 @@ import (
 
 type AppConfig struct {
 	TasksService      ServiceConfig         `yaml:"service_config" env-required:"true"`
-	AuthClient        ClientConfig          `yaml:"auth_service" env-required:"true"`
 	PredictionsClient ClientConfig          `yaml:"predictions_service" env-required:"true"`
-	GroupsClient      ClientConfig          `yaml:"groups_service" env-required:"true"`
-	GraphsClient      ClientConfig          `yaml:"graphs_service" env-required:"true"`
 	Storage           StorageConfig         `yaml:"postgres" env-required:"true"`
 	KafkaConfig       KafkaTasksTopicConfig `yaml:"kafka" env-required:"true"`
 }

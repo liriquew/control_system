@@ -1,0 +1,8 @@
+service_config:
+  port: 50051
+postgres:
+  username: postgres
+  password: passw0rd
+  host: postgres
+  port: 5432
+  db_name: control_system_auth

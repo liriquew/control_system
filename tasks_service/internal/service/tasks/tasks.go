@@ -8,8 +8,6 @@ import (
 	"strconv"
 
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	authclient "github.com/liriquew/tasks_service/internal/grpc/clients/auth_client"
-	grphclient "github.com/liriquew/tasks_service/internal/grpc/clients/graphs_client"
 	predictionsclient "github.com/liriquew/tasks_service/internal/grpc/clients/predictions_client"
 	"github.com/liriquew/tasks_service/internal/models"
 	repository "github.com/liriquew/tasks_service/internal/repository"
@@ -38,9 +36,7 @@ type tasksRepository interface {
 
 type serverAPI struct {
 	tsks_pb.UnimplementedTasksServer
-	authClient *authclient.AuthClient
 	prdtClient *predictionsclient.PredicionsClient
-	grphClient *grphclient.GraphClient
 	repository tasksRepository
 	log        *slog.Logger
 }
@@ -51,16 +47,12 @@ func Register(gRPC *grpc.Server, taskServiceAPI tsks_pb.TasksServer) {
 
 func NewServerAPI(log *slog.Logger,
 	taskRepository tasksRepository,
-	authClient *authclient.AuthClient,
 	prdtClient *predictionsclient.PredicionsClient,
-	grphClient *grphclient.GraphClient,
 ) *serverAPI {
 	return &serverAPI{
 		log:        log,
 		repository: taskRepository,
-		authClient: authClient,
 		prdtClient: prdtClient,
-		grphClient: grphClient,
 	}
 }
 

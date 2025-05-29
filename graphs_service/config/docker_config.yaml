@@ -1,0 +1,13 @@
+service_config:
+  port: 50055
+tasks_service:
+  host: tasks-service
+  port: 50054
+  timeout: 1s
+  retries: 1
+postgres:
+  username: postgres
+  password: passw0rd
+  host: postgres
+  port: 5432
+  db_name: control_system_graphs

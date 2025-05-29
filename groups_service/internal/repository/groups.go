@@ -25,9 +25,10 @@ const listTasksBatchSize = 10
 func NewGroupRepository(cfg config.StorageConfig) (*GroupsRepository, error) {
 	const op = "storage.postgres.New"
 
-	connStr := fmt.Sprintf("postgres://%s:%s@localhost:%d/%s?sslmode=disable",
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.Username,
 		cfg.Password,
+		cfg.Host,
 		cfg.Port,
 		cfg.DBName,
 	)

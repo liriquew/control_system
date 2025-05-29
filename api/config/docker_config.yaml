@@ -1,0 +1,28 @@
+api_gateway:
+  port: 8080
+  host: "localhost"
+auth_service:
+  host: auth-service
+  port: 50051
+  timeout: 1s
+  retries: 1
+predictions_service:
+  host: predictions-service
+  port: 50052
+  timeout: 1s
+  retries: 1
+groups_service:
+  host: groups-service
+  port: 50053
+  timeout: 1s
+  retries: 1
+tasks_service:
+  host: tasks-service
+  port: 50054
+  timeout: 1s
+  retries: 1
+graphs_service:
+  host: graphs-service
+  port: 50055
+  timeout: 1s
+  retries: 1
