@@ -1,6 +1,6 @@
 package graphtools
 
-import grph_tools "github.com/liriquew/graphs_service/internal/lib/graph_tools/tools_interface"
+import grph_tools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
 
 // HasCycle - возвращает true, если граф содержит цикл, false в противном случае
 // для обнаружения цикла использует топологическую сортировку

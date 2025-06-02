@@ -1,6 +1,6 @@
 package entities
 
-import "github.com/liriquew/control_system/internal/models"
+import "github.com/liriquew/control_system/api/internal/models"
 
 type PredictedTask struct {
 	Task          models.Task `json:"task"`

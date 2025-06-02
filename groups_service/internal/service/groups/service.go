@@ -6,18 +6,17 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/liriquew/control_system/groups_service/internal/models"
+	repository "github.com/liriquew/control_system/groups_service/internal/repository"
+	"github.com/liriquew/control_system/groups_service/pkg/logger/sl"
 	grpc_pb "github.com/liriquew/control_system/services_protos/groups_service"
-	"github.com/liriquew/groups_service/internal/models"
-	repository "github.com/liriquew/groups_service/internal/repository"
-	"github.com/liriquew/groups_service/pkg/logger/sl"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type GroupsRepository interface {
+type Repository interface {
 	CheckAdminPermission(ctx context.Context, userID, groupID int64) error
 	CheckEditorPermission(ctx context.Context, userID, groupID int64) error
 	CheckAccess(ctx context.Context, userID, groupID int64) error
@@ -33,24 +32,20 @@ type GroupsRepository interface {
 	ChangeMemberRole(ctx context.Context, ownerID int64, member *grpc_pb.GroupMember) error
 }
 
-type serverAPI struct {
+type Service struct {
 	grpc_pb.UnimplementedGroupsServer
-	repository GroupsRepository
+	repository Repository
 	log        *slog.Logger
 }
 
-func Register(gRPC *grpc.Server, taskServiceAPI grpc_pb.GroupsServer) {
-	grpc_pb.RegisterGroupsServer(gRPC, taskServiceAPI)
-}
-
-func NewServerAPI(log *slog.Logger, taskRepository GroupsRepository) *serverAPI {
-	return &serverAPI{
+func NewServerAPI(log *slog.Logger, taskRepository Repository) *Service {
+	return &Service{
 		log:        log,
 		repository: taskRepository,
 	}
 }
 
-func (s *serverAPI) Authenticate(ctx context.Context) (int64, error) {
+func (s *Service) Authenticate(ctx context.Context) (int64, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		s.log.Error("error while extracting metadata")
@@ -69,7 +64,7 @@ func (s *serverAPI) Authenticate(ctx context.Context) (int64, error) {
 	return userID, nil
 }
 
-func (s *serverAPI) CreateGroup(ctx context.Context, group *grpc_pb.Group) (*grpc_pb.GroupID, error) {
+func (s *Service) CreateGroup(ctx context.Context, group *grpc_pb.Group) (*grpc_pb.GroupID, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -92,7 +87,7 @@ func (s *serverAPI) CreateGroup(ctx context.Context, group *grpc_pb.Group) (*grp
 	}, nil
 }
 
-func (s *serverAPI) ListUserGroups(ctx context.Context, offset *grpc_pb.Offset) (*grpc_pb.GroupsList, error) {
+func (s *Service) ListUserGroups(ctx context.Context, offset *grpc_pb.Offset) (*grpc_pb.GroupsList, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -117,7 +112,7 @@ func (s *serverAPI) ListUserGroups(ctx context.Context, offset *grpc_pb.Offset) 
 	}, nil
 }
 
-func (s *serverAPI) GetGroup(ctx context.Context, groupID *grpc_pb.GroupID) (*grpc_pb.Group, error) {
+func (s *Service) GetGroup(ctx context.Context, groupID *grpc_pb.GroupID) (*grpc_pb.Group, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -145,7 +140,7 @@ func (s *serverAPI) GetGroup(ctx context.Context, groupID *grpc_pb.GroupID) (*gr
 	return models.ConvertGroupToProto(group), nil
 }
 
-func (s *serverAPI) DeleteGroup(ctx context.Context, groupID *grpc_pb.GroupID) (*emptypb.Empty, error) {
+func (s *Service) DeleteGroup(ctx context.Context, groupID *grpc_pb.GroupID) (*emptypb.Empty, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -168,7 +163,7 @@ func (s *serverAPI) DeleteGroup(ctx context.Context, groupID *grpc_pb.GroupID) (
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) UpdateGroup(ctx context.Context, group *grpc_pb.Group) (*emptypb.Empty, error) {
+func (s *Service) UpdateGroup(ctx context.Context, group *grpc_pb.Group) (*emptypb.Empty, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -197,7 +192,7 @@ func (s *serverAPI) UpdateGroup(ctx context.Context, group *grpc_pb.Group) (*emp
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) ListGroupMembers(ctx context.Context, groupID *grpc_pb.GroupID) (*grpc_pb.GroupMembersList, error) {
+func (s *Service) ListGroupMembers(ctx context.Context, groupID *grpc_pb.GroupID) (*grpc_pb.GroupMembersList, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -228,7 +223,7 @@ func (s *serverAPI) ListGroupMembers(ctx context.Context, groupID *grpc_pb.Group
 	}, nil
 }
 
-func (s *serverAPI) AddGroupMember(ctx context.Context, GroupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
+func (s *Service) AddGroupMember(ctx context.Context, GroupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -262,7 +257,7 @@ func (s *serverAPI) AddGroupMember(ctx context.Context, GroupMember *grpc_pb.Gro
 
 }
 
-func (s *serverAPI) RemoveGroupMember(ctx context.Context, GroupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
+func (s *Service) RemoveGroupMember(ctx context.Context, GroupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -285,7 +280,7 @@ func (s *serverAPI) RemoveGroupMember(ctx context.Context, GroupMember *grpc_pb.
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) ChangeMemberRole(ctx context.Context, GroupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
+func (s *Service) ChangeMemberRole(ctx context.Context, GroupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
 	userID, err := s.Authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -315,7 +310,7 @@ func (s *serverAPI) ChangeMemberRole(ctx context.Context, GroupMember *grpc_pb.G
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) CheckAdminPermission(ctx context.Context, groupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
+func (s *Service) CheckAdminPermission(ctx context.Context, groupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
 	if err := s.repository.CheckAdminPermission(ctx, groupMember.UserID, groupMember.GroupID); err != nil {
 		if errors.Is(err, repository.ErrDenied) {
 			return nil, status.Error(codes.NotFound, "user with permissions not found")
@@ -328,7 +323,7 @@ func (s *serverAPI) CheckAdminPermission(ctx context.Context, groupMember *grpc_
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) CheckEditorPermission(ctx context.Context, groupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
+func (s *Service) CheckEditorPermission(ctx context.Context, groupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
 	if err := s.repository.CheckEditorPermission(ctx, groupMember.UserID, groupMember.GroupID); err != nil {
 		if errors.Is(err, repository.ErrDenied) {
 			return nil, status.Error(codes.NotFound, "user with permissions not found")
@@ -341,7 +336,7 @@ func (s *serverAPI) CheckEditorPermission(ctx context.Context, groupMember *grpc
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) CheckMemberPermission(ctx context.Context, groupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
+func (s *Service) CheckMemberPermission(ctx context.Context, groupMember *grpc_pb.GroupMember) (*emptypb.Empty, error) {
 	if err := s.repository.CheckAccess(ctx, groupMember.UserID, groupMember.GroupID); err != nil {
 		if errors.Is(err, repository.ErrDenied) {
 			return nil, status.Error(codes.NotFound, "user with permissions not found")

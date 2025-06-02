@@ -8,18 +8,17 @@ import (
 	"strconv"
 
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	predictionsclient "github.com/liriquew/tasks_service/internal/grpc/clients/predictions_client"
-	"github.com/liriquew/tasks_service/internal/models"
-	repository "github.com/liriquew/tasks_service/internal/repository"
-	"github.com/liriquew/tasks_service/pkg/logger/sl"
-	"google.golang.org/grpc"
+	predictionsclient "github.com/liriquew/control_system/tasks_service/internal/grpc/clients/predictions_client"
+	"github.com/liriquew/control_system/tasks_service/internal/models"
+	repository "github.com/liriquew/control_system/tasks_service/internal/repository"
+	"github.com/liriquew/control_system/tasks_service/pkg/logger/sl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type tasksRepository interface {
+type Repository interface {
 	SaveTask(ctx context.Context, task *tsks_pb.Task) (int64, error)
 	GetGroupTasks(ctx context.Context, taskID int64) ([]*models.Task, error)
 	GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error)
@@ -34,34 +33,25 @@ type tasksRepository interface {
 	GetTasks(ctx context.Context, taskIDs []int64) ([]*models.Task, error)
 }
 
-type serverAPI struct {
+type Service struct {
 	tsks_pb.UnimplementedTasksServer
-	prdtClient *predictionsclient.PredicionsClient
-	repository tasksRepository
-	log        *slog.Logger
+	predictions *predictionsclient.Client
+	repository  Repository
+	log         *slog.Logger
 }
 
-func Register(gRPC *grpc.Server, taskServiceAPI tsks_pb.TasksServer) {
-	tsks_pb.RegisterTasksServer(gRPC, taskServiceAPI)
-}
-
-func NewServerAPI(log *slog.Logger,
-	taskRepository tasksRepository,
-	prdtClient *predictionsclient.PredicionsClient,
-) *serverAPI {
-	return &serverAPI{
-		log:        log,
-		repository: taskRepository,
-		prdtClient: prdtClient,
+func New(log *slog.Logger,
+	repository Repository,
+	predictionsClient *predictionsclient.Client,
+) *Service {
+	return &Service{
+		log:         log,
+		repository:  repository,
+		predictions: predictionsClient,
 	}
 }
 
-var (
-	ErrMissingJWT = errors.New("miss jwt token")
-	ErrDeny       = errors.New("denied")
-)
-
-func (s *serverAPI) authenticate(ctx context.Context) (int64, error) {
+func (s *Service) authenticate(ctx context.Context) (int64, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		s.log.Error("error while extracting metadata")
@@ -80,7 +70,7 @@ func (s *serverAPI) authenticate(ctx context.Context) (int64, error) {
 	return userID, nil
 }
 
-func (s *serverAPI) CreateTask(ctx context.Context, task *tsks_pb.Task) (*tsks_pb.TaskID, error) {
+func (s *Service) CreateTask(ctx context.Context, task *tsks_pb.Task) (*tsks_pb.TaskID, error) {
 	userID, err := s.authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -101,7 +91,7 @@ func (s *serverAPI) CreateTask(ctx context.Context, task *tsks_pb.Task) (*tsks_p
 	return &tsks_pb.TaskID{ID: task.ID}, nil
 }
 
-func (s *serverAPI) GetTask(ctx context.Context, taskID *tsks_pb.TaskID) (*tsks_pb.Task, error) {
+func (s *Service) GetTask(ctx context.Context, taskID *tsks_pb.TaskID) (*tsks_pb.Task, error) {
 	userID, err := s.authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -125,7 +115,7 @@ func (s *serverAPI) GetTask(ctx context.Context, taskID *tsks_pb.TaskID) (*tsks_
 	return models.ConvertModelToProto(task), nil
 }
 
-func (s *serverAPI) GetTaskList(ctx context.Context, req *tsks_pb.TaskListRequest) (*tsks_pb.TaskList, error) {
+func (s *Service) GetTaskList(ctx context.Context, req *tsks_pb.TaskListRequest) (*tsks_pb.TaskList, error) {
 	userID, err := s.authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -148,7 +138,7 @@ func (s *serverAPI) GetTaskList(ctx context.Context, req *tsks_pb.TaskListReques
 	}, nil
 }
 
-func (s *serverAPI) UpdateTask(ctx context.Context, task *tsks_pb.Task) (*emptypb.Empty, error) {
+func (s *Service) UpdateTask(ctx context.Context, task *tsks_pb.Task) (*emptypb.Empty, error) {
 	userID, err := s.authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -198,7 +188,7 @@ func (s *serverAPI) UpdateTask(ctx context.Context, task *tsks_pb.Task) (*emptyp
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) DeleteTask(ctx context.Context, taskID *tsks_pb.TaskID) (*emptypb.Empty, error) {
+func (s *Service) DeleteTask(ctx context.Context, taskID *tsks_pb.TaskID) (*emptypb.Empty, error) {
 	userID, err := s.authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -233,7 +223,7 @@ func (s *serverAPI) DeleteTask(ctx context.Context, taskID *tsks_pb.TaskID) (*em
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) PredictTask(ctx context.Context, taskID *tsks_pb.TaskID) (*tsks_pb.PredictedTask, error) {
+func (s *Service) PredictTask(ctx context.Context, taskID *tsks_pb.TaskID) (*tsks_pb.PredictedTask, error) {
 	task, err := s.repository.GetTaskByID(ctx, taskID.ID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -248,7 +238,7 @@ func (s *serverAPI) PredictTask(ctx context.Context, taskID *tsks_pb.TaskID) (*t
 		return nil, status.Error(codes.FailedPrecondition, "task doesn't have assigned user")
 	}
 	s.log.Debug("Task form db", slog.Any("task", task))
-	predictedTime, err := s.prdtClient.Predict(ctx, task)
+	predictedTime, err := s.predictions.Predict(ctx, task)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "internal")
 	}
@@ -267,7 +257,7 @@ func (s *serverAPI) PredictTask(ctx context.Context, taskID *tsks_pb.TaskID) (*t
 
 // internal services API
 
-func (s *serverAPI) TaskExists(ctx context.Context, req *tsks_pb.TaskExistsRequest) (*emptypb.Empty, error) {
+func (s *Service) TaskExists(ctx context.Context, req *tsks_pb.TaskExistsRequest) (*emptypb.Empty, error) {
 	if err := s.repository.TaskInGroup(ctx, req.GroupID, req.TaskID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "not found")
@@ -280,7 +270,7 @@ func (s *serverAPI) TaskExists(ctx context.Context, req *tsks_pb.TaskExistsReque
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) GetGroupTasks(ctx context.Context, groupID *tsks_pb.GroupID) (*tsks_pb.TaskList, error) {
+func (s *Service) GetGroupTasks(ctx context.Context, groupID *tsks_pb.GroupID) (*tsks_pb.TaskList, error) {
 	tasks, err := s.repository.GetGroupTasks(ctx, groupID.ID)
 	if err != nil && errors.Is(err, repository.ErrNotFound) {
 		return nil, status.Error(codes.Internal, "internal")
@@ -296,7 +286,7 @@ func (s *serverAPI) GetGroupTasks(ctx context.Context, groupID *tsks_pb.GroupID)
 	}, nil
 }
 
-func (s *serverAPI) GetPredictedTasks(ctx context.Context, taskIDs *tsks_pb.TasksIDs) (*tsks_pb.PredictedTaskList, error) {
+func (s *Service) GetPredictedTasks(ctx context.Context, taskIDs *tsks_pb.TasksIDs) (*tsks_pb.PredictedTaskList, error) {
 	tasks, err := s.repository.GetTasks(ctx, taskIDs.IDs)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -325,7 +315,7 @@ func (s *serverAPI) GetPredictedTasks(ctx context.Context, taskIDs *tsks_pb.Task
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("some ids not found %v", badIDs))
 	}
 
-	predictedTasks, unpredictedUIDs, err := s.prdtClient.PredictList(ctx, tasks)
+	predictedTasks, unpredictedUIDs, err := s.predictions.PredictList(ctx, tasks)
 	if err != nil {
 		if errors.Is(err, predictionsclient.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "not found")

@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/liriquew/control_system/internal/app"
-	"github.com/liriquew/control_system/internal/lib/config"
-	"github.com/liriquew/control_system/pkg/logger"
-	"github.com/liriquew/control_system/pkg/logger/sl"
+	"github.com/liriquew/control_system/api/internal/app"
+	"github.com/liriquew/control_system/api/internal/lib/config"
+	"github.com/liriquew/control_system/api/pkg/logger"
+	"github.com/liriquew/control_system/api/pkg/logger/sl"
 )
 
 func main() {

@@ -7,22 +7,20 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/liriquew/control_system/groups_service/internal/lib/config"
+	"github.com/liriquew/control_system/groups_service/internal/models"
 	grpc_pb "github.com/liriquew/control_system/services_protos/groups_service"
-	"github.com/liriquew/groups_service/internal/lib/config"
-	"github.com/liriquew/groups_service/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
-type GroupsRepository struct {
+type Repository struct {
 	db *sqlx.DB
 }
 
-const listTasksBatchSize = 10
-
-func NewGroupRepository(cfg config.StorageConfig) (*GroupsRepository, error) {
+func New(cfg config.StorageConfig) (*Repository, error) {
 	const op = "storage.postgres.New"
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
@@ -42,12 +40,12 @@ func NewGroupRepository(cfg config.StorageConfig) (*GroupsRepository, error) {
 		panic(op + ":" + err.Error())
 	}
 
-	return &GroupsRepository{
+	return &Repository{
 		db: db,
 	}, nil
 }
 
-func (s *GroupsRepository) Close() error {
+func (s *Repository) Close() error {
 	return s.db.Close()
 }
 
@@ -62,14 +60,14 @@ var (
 	ErrAlreadyInGroup  = errors.New("already in group")
 )
 
-func (gr *GroupsRepository) CheckAccess(ctx context.Context, userID, groupID int64) error {
+func (r *Repository) CheckAccess(ctx context.Context, userID, groupID int64) error {
 	query := `
-		SELECT 1 FROM group_members gm 
+		SELECT 1 FROM group_members gm
 		WHERE gm.user_id = $1 AND gm.group_id = $2
 	`
 
 	var val int
-	if err := gr.db.QueryRowContext(ctx, query, userID, groupID).Scan(&val); err != nil {
+	if err := r.db.QueryRowContext(ctx, query, userID, groupID).Scan(&val); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrDenied
 		}
@@ -79,14 +77,14 @@ func (gr *GroupsRepository) CheckAccess(ctx context.Context, userID, groupID int
 	return nil
 }
 
-func (gr *GroupsRepository) checkPermission(ctx context.Context, userID, groupID int64, roles []string) error {
+func (r *Repository) checkPermission(ctx context.Context, userID, groupID int64, roles []string) error {
 	query := `
-		SELECT 1 FROM group_members gm 
+		SELECT 1 FROM group_members gm
 		WHERE gm.user_id = $1 AND gm.group_id = $2 AND gm.role = ANY($3)
 	`
 
 	var val int64
-	err := gr.db.QueryRowContext(ctx, query, userID, groupID, pq.Array(roles)).Scan(&val)
+	err := r.db.QueryRowContext(ctx, query, userID, groupID, pq.Array(roles)).Scan(&val)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrDenied
@@ -98,16 +96,16 @@ func (gr *GroupsRepository) checkPermission(ctx context.Context, userID, groupID
 	return nil
 }
 
-func (gr *GroupsRepository) CheckEditorPermission(ctx context.Context, userID, groupID int64) error {
-	return gr.checkPermission(ctx, userID, groupID, []string{"admin", "editor"})
+func (r *Repository) CheckEditorPermission(ctx context.Context, userID, groupID int64) error {
+	return r.checkPermission(ctx, userID, groupID, []string{"admin", "editor"})
 }
 
-func (gr *GroupsRepository) CheckAdminPermission(ctx context.Context, userID, groupID int64) error {
-	return gr.checkPermission(ctx, userID, groupID, []string{"admin"})
+func (r *Repository) CheckAdminPermission(ctx context.Context, userID, groupID int64) error {
+	return r.checkPermission(ctx, userID, groupID, []string{"admin"})
 }
 
-func (gr *GroupsRepository) CreateGroup(ctx context.Context, group *grpc_pb.Group) (int64, error) {
-	txn, err := gr.db.Begin()
+func (r *Repository) CreateGroup(ctx context.Context, group *grpc_pb.Group) (int64, error) {
+	txn, err := r.db.Begin()
 	if err != nil {
 		return 0, err
 	}
@@ -145,7 +143,7 @@ func (gr *GroupsRepository) CreateGroup(ctx context.Context, group *grpc_pb.Grou
 	return group.ID, nil
 }
 
-func (gr *GroupsRepository) GetGroup(ctx context.Context, userID, groupID int64) (*models.Group, error) {
+func (r *Repository) GetGroup(ctx context.Context, userID, groupID int64) (*models.Group, error) {
 	query := `
 		SELECT g.id, g.owner_id, g.name, g.description, g.created_at FROM groups g
 		JOIN group_members m ON g.id = m.group_id
@@ -153,7 +151,7 @@ func (gr *GroupsRepository) GetGroup(ctx context.Context, userID, groupID int64)
 	`
 
 	var group models.Group
-	err := gr.db.GetContext(ctx, &group, query, groupID, userID)
+	err := r.db.GetContext(ctx, &group, query, groupID, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -164,14 +162,14 @@ func (gr *GroupsRepository) GetGroup(ctx context.Context, userID, groupID int64)
 	return &group, err
 }
 
-func (gr *GroupsRepository) ListUserGroups(ctx context.Context, userID int64, offset int64) ([]*models.Group, error) {
+func (r *Repository) ListUserGroups(ctx context.Context, userID int64, offset int64) ([]*models.Group, error) {
 	query := `
 		SELECT * FROM groups
 		WHERE id IN (SELECT group_id FROM group_members WHERE user_id=$1) ORDER BY created_at OFFSET $2 LIMIT 10
 	`
 
 	var groups []*models.Group
-	err := gr.db.SelectContext(ctx, &groups, query, userID, offset)
+	err := r.db.SelectContext(ctx, &groups, query, userID, offset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("groups not found%w", ErrNotFound)
@@ -182,10 +180,10 @@ func (gr *GroupsRepository) ListUserGroups(ctx context.Context, userID int64, of
 	return groups, err
 }
 
-func (gr *GroupsRepository) DeleteGroup(ctx context.Context, ownerID, groupID int64) error {
+func (r *Repository) DeleteGroup(ctx context.Context, ownerID, groupID int64) error {
 	query := `DELETE FROM groups WHERE id=$2 AND owner_id=$1`
 
-	result, err := gr.db.ExecContext(ctx, query, ownerID, groupID)
+	result, err := r.db.ExecContext(ctx, query, ownerID, groupID)
 	if err != nil {
 		return err
 	}
@@ -198,7 +196,7 @@ func (gr *GroupsRepository) DeleteGroup(ctx context.Context, ownerID, groupID in
 	return nil
 }
 
-func (gr *GroupsRepository) UpdateGroup(ctx context.Context, group *grpc_pb.Group) error {
+func (r *Repository) UpdateGroup(ctx context.Context, group *grpc_pb.Group) error {
 	var fields []string
 	args := []any{
 		0: group.ID,
@@ -219,7 +217,7 @@ func (gr *GroupsRepository) UpdateGroup(ctx context.Context, group *grpc_pb.Grou
 
 	query := fmt.Sprintf("UPDATE groups SET %s WHERE id=$1", strings.Join(fields, ", "))
 
-	result, err := gr.db.ExecContext(ctx, query, args...)
+	result, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -235,14 +233,14 @@ func (gr *GroupsRepository) UpdateGroup(ctx context.Context, group *grpc_pb.Grou
 	return nil
 }
 
-func (gr *GroupsRepository) ListGroupMembers(ctx context.Context, groupID int64) ([]*models.GroupMember, error) {
+func (r *Repository) ListGroupMembers(ctx context.Context, groupID int64) ([]*models.GroupMember, error) {
 	query := `
         SELECT user_id, role FROM group_members
         WHERE group_id = $1
 	`
 
 	var users []*models.GroupMember
-	err := gr.db.SelectContext(ctx, &users, query, groupID)
+	err := r.db.SelectContext(ctx, &users, query, groupID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
@@ -250,7 +248,7 @@ func (gr *GroupsRepository) ListGroupMembers(ctx context.Context, groupID int64)
 	return users, nil
 }
 
-func (gr *GroupsRepository) AddGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error {
+func (r *Repository) AddGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error {
 	if member.Role == "" {
 		member.Role = "member"
 	}
@@ -270,7 +268,7 @@ func (gr *GroupsRepository) AddGroupMember(ctx context.Context, member *grpc_pb.
         VALUES ($1, $2, $3)
     `
 
-	_, err := gr.db.ExecContext(ctx, query, member.GroupID, member.UserID, member.Role)
+	_, err := r.db.ExecContext(ctx, query, member.GroupID, member.UserID, member.Role)
 
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
@@ -299,15 +297,15 @@ func (gr *GroupsRepository) AddGroupMember(ctx context.Context, member *grpc_pb.
 	return nil
 }
 
-func (gr *GroupsRepository) RemoveGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error {
+func (r *Repository) RemoveGroupMember(ctx context.Context, member *grpc_pb.GroupMember) error {
 	query := `
-		DELETE FROM group_members 
-		WHERE 
-			group_id=$1 AND 
+		DELETE FROM group_members
+		WHERE
+			group_id=$1 AND
 			user_id=$2
 	`
 
-	result, err := gr.db.ExecContext(ctx, query, member.GroupID, member.UserID)
+	result, err := r.db.ExecContext(ctx, query, member.GroupID, member.UserID)
 	if err != nil {
 		return err
 	}
@@ -320,7 +318,7 @@ func (gr *GroupsRepository) RemoveGroupMember(ctx context.Context, member *grpc_
 	return nil
 }
 
-func (gr *GroupsRepository) ChangeMemberRole(ctx context.Context, ownerID int64, member *grpc_pb.GroupMember) error {
+func (r *Repository) ChangeMemberRole(ctx context.Context, ownerID int64, member *grpc_pb.GroupMember) error {
 	validRoles := map[string]struct{}{
 		"admin":  {},
 		"editor": {},
@@ -335,7 +333,7 @@ func (gr *GroupsRepository) ChangeMemberRole(ctx context.Context, ownerID int64,
         UPDATE group_members SET role=$1 WHERE group_id=$2 AND user_id=$3
     `
 
-	result, err := gr.db.ExecContext(ctx, query, member.Role, member.GroupID, member.UserID)
+	result, err := r.db.ExecContext(ctx, query, member.Role, member.GroupID, member.UserID)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code {

@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/liriquew/tasks_service/internal/lib/config"
-	"github.com/liriquew/tasks_service/internal/models"
-	"github.com/liriquew/tasks_service/pkg/logger/sl"
+	"github.com/liriquew/control_system/tasks_service/internal/lib/config"
+	"github.com/liriquew/control_system/tasks_service/internal/models"
+	"github.com/liriquew/control_system/tasks_service/pkg/logger/sl"
 	"github.com/segmentio/kafka-go"
 )
 

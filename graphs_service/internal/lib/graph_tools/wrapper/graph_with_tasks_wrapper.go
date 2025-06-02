@@ -1,9 +1,9 @@
 package graph_wrapper
 
 import (
-	"github.com/liriquew/graphs_service/internal/entities"
+	"github.com/liriquew/control_system/graphs_service/internal/entities"
 
-	grph_tools "github.com/liriquew/graphs_service/internal/lib/graph_tools/tools_interface"
+	grph_tools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
 )
 
 type WrapperGraphWithTasks struct {

@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/liriquew/graphs_service/internal/entities"
-	"github.com/liriquew/graphs_service/internal/lib/config"
-	"github.com/liriquew/graphs_service/internal/models"
+	"github.com/liriquew/control_system/graphs_service/internal/entities"
+	"github.com/liriquew/control_system/graphs_service/internal/lib/config"
+	"github.com/liriquew/control_system/graphs_service/internal/models"
 
 	grph_pb "github.com/liriquew/control_system/services_protos/graphs_service"
 
@@ -23,7 +23,7 @@ type GraphsRepository struct {
 
 const listGraphsBatchSize = 10
 
-func NewGraphsRepository(cfg config.StorageConfig) (*GraphsRepository, error) {
+func New(cfg config.StorageConfig) (*GraphsRepository, error) {
 	const op = "storage.postgres.New"
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",

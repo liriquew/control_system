@@ -1,4 +1,4 @@
-module github.com/liriquew/graphs_service
+module github.com/liriquew/control_system/graphs_service
 
 go 1.24.1
 

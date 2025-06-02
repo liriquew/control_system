@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	graph_tools_interface "github.com/liriquew/graphs_service/internal/lib/graph_tools/tools_interface"
+	graph_tools_interface "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
 )
 
 var (

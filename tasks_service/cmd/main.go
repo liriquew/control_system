@@ -6,9 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/liriquew/tasks_service/internal/app"
-	"github.com/liriquew/tasks_service/internal/lib/config"
-	"github.com/liriquew/tasks_service/pkg/logger"
+	"github.com/liriquew/control_system/tasks_service/internal/app"
+	"github.com/liriquew/control_system/tasks_service/internal/lib/config"
+	"github.com/liriquew/control_system/tasks_service/pkg/logger"
 )
 
 func main() {

@@ -3,7 +3,7 @@ package auth
 import (
 	"log/slog"
 
-	authclient "github.com/liriquew/control_system/internal/grpc/clients/auth"
+	authclient "github.com/liriquew/control_system/api/internal/grpc/clients/auth"
 )
 
 type AuthService struct {

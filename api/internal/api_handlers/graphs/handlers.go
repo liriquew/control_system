@@ -6,14 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/liriquew/control_system/internal/api_handlers/groups"
-	"github.com/liriquew/control_system/internal/entities"
-	graphsclient "github.com/liriquew/control_system/internal/grpc/clients/graphs"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
-	jsontools "github.com/liriquew/control_system/internal/lib/json_tools"
-	"github.com/liriquew/control_system/pkg/logger/sl"
+	"github.com/liriquew/control_system/api/internal/api_handlers/groups"
+	"github.com/liriquew/control_system/api/internal/entities"
+	graphsclient "github.com/liriquew/control_system/api/internal/grpc/clients/graphs"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
+	jsontools "github.com/liriquew/control_system/api/internal/lib/json_tools"
+	"github.com/liriquew/control_system/api/pkg/logger/sl"
 
-	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/api/internal/models"
 )
 
 type GpraphsAPI interface {

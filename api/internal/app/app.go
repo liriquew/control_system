@@ -3,17 +3,17 @@ package app
 import (
 	"log/slog"
 
-	"github.com/liriquew/control_system/internal/api_handlers/auth"
-	"github.com/liriquew/control_system/internal/api_handlers/graphs"
-	"github.com/liriquew/control_system/internal/api_handlers/groups"
-	tasks "github.com/liriquew/control_system/internal/api_handlers/task"
-	appapi "github.com/liriquew/control_system/internal/app/api"
-	authclient "github.com/liriquew/control_system/internal/grpc/clients/auth"
-	graphsclient "github.com/liriquew/control_system/internal/grpc/clients/graphs"
-	groupsclient "github.com/liriquew/control_system/internal/grpc/clients/groups"
-	predictionsclient "github.com/liriquew/control_system/internal/grpc/clients/predictions"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
-	"github.com/liriquew/control_system/internal/lib/config"
+	"github.com/liriquew/control_system/api/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/api/internal/api_handlers/graphs"
+	"github.com/liriquew/control_system/api/internal/api_handlers/groups"
+	tasks "github.com/liriquew/control_system/api/internal/api_handlers/task"
+	appapi "github.com/liriquew/control_system/api/internal/app/api"
+	authclient "github.com/liriquew/control_system/api/internal/grpc/clients/auth"
+	graphsclient "github.com/liriquew/control_system/api/internal/grpc/clients/graphs"
+	groupsclient "github.com/liriquew/control_system/api/internal/grpc/clients/groups"
+	predictionsclient "github.com/liriquew/control_system/api/internal/grpc/clients/predictions"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
+	"github.com/liriquew/control_system/api/internal/lib/config"
 
 	"github.com/go-chi/chi/v5"
 )

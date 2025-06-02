@@ -5,10 +5,10 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/liriquew/auth_service/internal/lib/jwt"
-	"github.com/liriquew/auth_service/internal/models"
-	"github.com/liriquew/auth_service/internal/repository"
-	"github.com/liriquew/auth_service/pkg/logger/sl"
+	"github.com/liriquew/control_system/auth_service/internal/lib/jwt"
+	"github.com/liriquew/control_system/auth_service/internal/models"
+	"github.com/liriquew/control_system/auth_service/internal/repository"
+	"github.com/liriquew/control_system/auth_service/pkg/logger/sl"
 	auth_pb "github.com/liriquew/control_system/services_protos/auth_service"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type tasksRepository interface {
+type Repository interface {
 	SaveUser(ctx context.Context, username string, password []byte) (int64, error)
 	GetUser(ctx context.Context, username string) (*models.User, error)
 	GetUsersDetails(ctx context.Context, userIDs []int64) ([]*models.User, error)
@@ -24,15 +24,15 @@ type tasksRepository interface {
 
 type serverAPI struct {
 	auth_pb.UnimplementedAuthServer
-	repository tasksRepository
+	repository Repository
 	log        *slog.Logger
 }
 
-func Register(gRPC *grpc.Server, taskServiceAPI auth_pb.AuthServer) {
-	auth_pb.RegisterAuthServer(gRPC, taskServiceAPI)
+func Register(gRPC *grpc.Server, service auth_pb.AuthServer) {
+	auth_pb.RegisterAuthServer(gRPC, service)
 }
 
-func NewServerAPI(log *slog.Logger, taskRepository tasksRepository) *serverAPI {
+func NewServerAPI(log *slog.Logger, taskRepository Repository) *serverAPI {
 	return &serverAPI{
 		log:        log,
 		repository: taskRepository,

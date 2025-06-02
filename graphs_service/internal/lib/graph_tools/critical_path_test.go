@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liriquew/graphs_service/internal/entities"
-	graph_wrapper "github.com/liriquew/graphs_service/internal/lib/graph_tools/wrapper"
-	"github.com/liriquew/graphs_service/internal/models"
+	"github.com/liriquew/control_system/graphs_service/internal/entities"
+	graph_wrapper "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/wrapper"
+	"github.com/liriquew/control_system/graphs_service/internal/models"
 )
 
 func ptrInt64(v int64) *int64 { return &v }

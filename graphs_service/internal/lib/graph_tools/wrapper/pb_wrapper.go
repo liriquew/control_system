@@ -1,8 +1,8 @@
 package graph_wrapper
 
 import (
+	grph_tools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
 	grph_pb "github.com/liriquew/control_system/services_protos/graphs_service"
-	grph_tools "github.com/liriquew/graphs_service/internal/lib/graph_tools/tools_interface"
 )
 
 type WrapperPredictedGraph struct {

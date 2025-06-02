@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/liriquew/control_system/internal/entities"
-	"github.com/liriquew/control_system/internal/models"
-	"github.com/liriquew/control_system/tests/suite"
+	"github.com/liriquew/control_system/api/internal/entities"
+	"github.com/liriquew/control_system/api/internal/models"
+	"github.com/liriquew/control_system/api/tests/suite"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/golang-jwt/jwt"

@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"log/slog"
 
-	predictionsclient "github.com/liriquew/tasks_service/internal/grpc/clients/predictions_client"
-	"github.com/liriquew/tasks_service/internal/kafka"
-	"github.com/liriquew/tasks_service/internal/lib/config"
-	"github.com/liriquew/tasks_service/internal/outbox"
-	"github.com/liriquew/tasks_service/internal/service/tasks"
-	"github.com/liriquew/tasks_service/pkg/logger/sl"
+	predictionsclient "github.com/liriquew/control_system/tasks_service/internal/grpc/clients/predictions_client"
+	"github.com/liriquew/control_system/tasks_service/internal/kafka"
+	"github.com/liriquew/control_system/tasks_service/internal/lib/config"
+	"github.com/liriquew/control_system/tasks_service/internal/outbox"
+	tasks_service "github.com/liriquew/control_system/tasks_service/internal/service/tasks"
+	"github.com/liriquew/control_system/tasks_service/pkg/logger/sl"
 
-	grpcapp "github.com/liriquew/tasks_service/internal/app/grpc_app"
-	tasks_repository "github.com/liriquew/tasks_service/internal/repository"
+	grpcapp "github.com/liriquew/control_system/tasks_service/internal/app/grpc_app"
+	repository "github.com/liriquew/control_system/tasks_service/internal/repository"
 )
 
 type App struct {
@@ -23,7 +23,7 @@ type App struct {
 }
 
 func New(log *slog.Logger, cfg config.AppConfig) *App {
-	storage, err := tasks_repository.NewTaskRepository(cfg.Storage)
+	storage, err := repository.New(cfg.Storage)
 	if err != nil {
 		panic(err)
 	}
@@ -33,14 +33,14 @@ func New(log *slog.Logger, cfg config.AppConfig) *App {
 		panic(err)
 	}
 
-	prdtClient, err := predictionsclient.NewPredictionsClient(log, cfg.PredictionsClient)
+	predictionsClient, err := predictionsclient.New(log, cfg.PredictionsClient)
 	if err != nil {
 		panic(err)
 	}
 
 	outbox := outbox.New(log, producer, storage)
 
-	tasksService := tasks.NewServerAPI(log, storage, prdtClient)
+	tasksService := tasks_service.New(log, storage, predictionsClient)
 
 	app := grpcapp.New(log, tasksService, cfg.TasksService.Port)
 

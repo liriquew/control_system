@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	authclient "github.com/liriquew/control_system/internal/grpc/clients/auth"
-	jsontools "github.com/liriquew/control_system/internal/lib/json_tools"
-	"github.com/liriquew/control_system/internal/models"
-	"github.com/liriquew/control_system/pkg/logger/sl"
+	authclient "github.com/liriquew/control_system/api/internal/grpc/clients/auth"
+	jsontools "github.com/liriquew/control_system/api/internal/lib/json_tools"
+	"github.com/liriquew/control_system/api/internal/models"
+	"github.com/liriquew/control_system/api/pkg/logger/sl"
 )
 
 type AuthAPI interface {

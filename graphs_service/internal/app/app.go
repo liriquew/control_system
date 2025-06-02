@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/liriquew/graphs_service/internal/lib/config"
-	graphsservice "github.com/liriquew/graphs_service/internal/service/graphs"
-	"github.com/liriquew/graphs_service/pkg/logger/sl"
+	"github.com/liriquew/control_system/graphs_service/internal/lib/config"
+	graphs_service "github.com/liriquew/control_system/graphs_service/internal/service/graphs"
+	"github.com/liriquew/control_system/graphs_service/pkg/logger/sl"
 
-	tasksclient "github.com/liriquew/graphs_service/internal/grpc/clients/tasks"
+	tasks_client "github.com/liriquew/control_system/graphs_service/internal/grpc/clients/tasks"
 
-	grpcapp "github.com/liriquew/graphs_service/internal/app/grpc_app"
-	auth_repository "github.com/liriquew/graphs_service/internal/repository"
+	grpcapp "github.com/liriquew/control_system/graphs_service/internal/app/grpc_app"
+	"github.com/liriquew/control_system/graphs_service/internal/repository"
 )
 
 type App struct {
@@ -21,19 +21,19 @@ type App struct {
 }
 
 func New(log *slog.Logger, cfg config.AppConfig) *App {
-	storage, err := auth_repository.NewGraphsRepository(cfg.Storage)
+	storage, err := repository.New(cfg.Storage)
 	if err != nil {
 		panic(err)
 	}
 
-	tasksClient, err := tasksclient.NewTasksClient(log, cfg.TasksClient)
+	tasksClient, err := tasks_client.New(log, cfg.TasksClient)
 	if err != nil {
 		panic(err)
 	}
 
-	graphsService := graphsservice.NewServerAPI(log, storage, tasksClient)
+	service := graphs_service.New(log, storage, tasksClient)
 
-	app := grpcapp.New(log, graphsService, cfg.ServiceConfig.Port)
+	app := grpcapp.New(log, service, cfg.ServiceConfig.Port)
 
 	mainApp := &App{GRPCServer: app, log: log}
 	mainApp.closers = append(mainApp.closers, storage.Close)

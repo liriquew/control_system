@@ -6,9 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/liriquew/auth_service/internal/app"
-	"github.com/liriquew/auth_service/internal/lib/config"
-	"github.com/liriquew/auth_service/pkg/logger"
+	"github.com/liriquew/control_system/auth_service/internal/app"
+	"github.com/liriquew/control_system/auth_service/internal/lib/config"
+	"github.com/liriquew/control_system/auth_service/pkg/logger"
 )
 
 func main() {

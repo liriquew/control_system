@@ -9,9 +9,9 @@ import (
 	grpclog "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 
-	"github.com/liriquew/control_system/internal/lib/config"
-	"github.com/liriquew/control_system/internal/lib/converter"
-	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/api/internal/lib/config"
+	"github.com/liriquew/control_system/api/internal/lib/converter"
+	"github.com/liriquew/control_system/api/internal/models"
 	grps_pb "github.com/liriquew/control_system/services_protos/groups_service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

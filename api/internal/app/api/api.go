@@ -3,10 +3,10 @@ package appapi
 import (
 	"net/http"
 
-	"github.com/liriquew/control_system/internal/api_handlers/auth"
-	"github.com/liriquew/control_system/internal/api_handlers/graphs"
-	"github.com/liriquew/control_system/internal/api_handlers/groups"
-	"github.com/liriquew/control_system/internal/api_handlers/task"
+	"github.com/liriquew/control_system/api/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/api/internal/api_handlers/graphs"
+	"github.com/liriquew/control_system/api/internal/api_handlers/groups"
+	"github.com/liriquew/control_system/api/internal/api_handlers/task"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"

@@ -6,8 +6,7 @@ import (
 	"log/slog"
 	"net"
 
-	pb2 "github.com/liriquew/control_system/services_protos/graphs_service"
-	graphs_server "github.com/liriquew/graphs_service/internal/service/graphs"
+	grph_pb "github.com/liriquew/control_system/services_protos/graphs_service"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -23,7 +22,7 @@ type App struct {
 }
 
 // New creates new gRPC server app.
-func New(log *slog.Logger, graphsService pb2.GraphsServer, port int) *App {
+func New(log *slog.Logger, service grph_pb.GraphsServer, port int) *App {
 	loggingOpts := []logging.Option{
 		logging.WithLogOnEvents(
 			logging.PayloadReceived, logging.PayloadSent,
@@ -31,7 +30,7 @@ func New(log *slog.Logger, graphsService pb2.GraphsServer, port int) *App {
 	}
 
 	recoveryOpts := []recovery.Option{
-		recovery.WithRecoveryHandler(func(p interface{}) (err error) {
+		recovery.WithRecoveryHandler(func(p any) (err error) {
 			log.Error("Recovered from panic", slog.Any("panic", p))
 
 			return status.Errorf(codes.Internal, "internal error")
@@ -43,7 +42,7 @@ func New(log *slog.Logger, graphsService pb2.GraphsServer, port int) *App {
 		logging.UnaryServerInterceptor(InterceptorLogger(log), loggingOpts...),
 	))
 
-	graphs_server.Register(gRPCServer, graphsService)
+	grph_pb.RegisterGraphsServer(gRPCServer, service)
 
 	return &App{
 		log:        log,

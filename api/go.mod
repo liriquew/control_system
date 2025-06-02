@@ -1,4 +1,4 @@
-module github.com/liriquew/control_system
+module github.com/liriquew/control_system/api
 
 go 1.24.1
 

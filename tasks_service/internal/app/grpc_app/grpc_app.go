@@ -7,7 +7,6 @@ import (
 	"net"
 
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	task_server "github.com/liriquew/tasks_service/internal/service/tasks"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -22,7 +21,6 @@ type App struct {
 	port       int
 }
 
-// New creates new gRPC server app.
 func New(log *slog.Logger, tasksService tsks_pb.TasksServer, port int) *App {
 	loggingOpts := []logging.Option{
 		logging.WithLogOnEvents(
@@ -43,7 +41,7 @@ func New(log *slog.Logger, tasksService tsks_pb.TasksServer, port int) *App {
 		logging.UnaryServerInterceptor(InterceptorLogger(log), loggingOpts...),
 	))
 
-	task_server.Register(gRPCServer, tasksService)
+	tsks_pb.RegisterTasksServer(gRPCServer, tasksService)
 
 	return &App{
 		log:        log,

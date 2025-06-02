@@ -3,9 +3,9 @@ package graphtools
 import (
 	"testing"
 
-	"github.com/liriquew/graphs_service/internal/entities"
-	graph_wrapper "github.com/liriquew/graphs_service/internal/lib/graph_tools/wrapper"
-	"github.com/liriquew/graphs_service/internal/models"
+	"github.com/liriquew/control_system/graphs_service/internal/entities"
+	graph_wrapper "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/wrapper"
+	"github.com/liriquew/control_system/graphs_service/internal/models"
 )
 
 func TestCountConnectedComponents(t *testing.T) {

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/liriquew/groups_service/internal/lib/config"
-	"github.com/liriquew/groups_service/internal/service/groups"
-	"github.com/liriquew/groups_service/pkg/logger/sl"
+	"github.com/liriquew/control_system/groups_service/internal/lib/config"
+	groups_service "github.com/liriquew/control_system/groups_service/internal/service/groups"
+	"github.com/liriquew/control_system/groups_service/pkg/logger/sl"
 
-	grpcapp "github.com/liriquew/groups_service/internal/app/grpc_app"
-	tasks_repository "github.com/liriquew/groups_service/internal/repository"
+	grpcapp "github.com/liriquew/control_system/groups_service/internal/app/grpc_app"
+	repository "github.com/liriquew/control_system/groups_service/internal/repository"
 )
 
 type App struct {
@@ -19,14 +19,14 @@ type App struct {
 }
 
 func New(log *slog.Logger, cfg config.AppConfig) *App {
-	storage, err := tasks_repository.NewGroupRepository(cfg.Storage)
+	storage, err := repository.New(cfg.Storage)
 	if err != nil {
 		panic(err)
 	}
 
-	tasksService := groups.NewServerAPI(log, storage)
+	service := groups_service.NewServerAPI(log, storage)
 
-	app := grpcapp.New(log, tasksService, cfg.ServiceConfig.Port)
+	app := grpcapp.New(log, service, cfg.ServiceConfig.Port)
 
 	mainApp := &App{GRPCServer: app, log: log}
 	mainApp.closers = append(mainApp.closers, storage.Close)

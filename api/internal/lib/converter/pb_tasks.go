@@ -1,8 +1,8 @@
 package converter
 
 import (
-	"github.com/liriquew/control_system/internal/entities"
-	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/api/internal/entities"
+	"github.com/liriquew/control_system/api/internal/models"
 	prdt_pb "github.com/liriquew/control_system/services_protos/predictions_service"
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
 	"google.golang.org/protobuf/types/known/timestamppb"

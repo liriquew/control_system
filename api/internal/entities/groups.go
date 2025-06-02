@@ -1,6 +1,6 @@
 package entities
 
-import "github.com/liriquew/control_system/internal/models"
+import "github.com/liriquew/control_system/api/internal/models"
 
 type GroupWithTasks struct {
 	Group *models.Group  `json:"group"`

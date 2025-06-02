@@ -9,20 +9,20 @@ import (
 	grpclog "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 
+	"github.com/liriquew/control_system/graphs_service/internal/lib/config"
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	"github.com/liriquew/graphs_service/internal/lib/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
-type TasksClient struct {
+type Client struct {
 	client tsks_pb.TasksClient
 	log    *slog.Logger
 }
 
-func NewTasksClient(log *slog.Logger, cfg config.ClientConfig) (*TasksClient, error) {
+func New(log *slog.Logger, cfg config.ClientConfig) (*Client, error) {
 	const op = "authclient.New"
 
 	retryOpts := []grpcretry.CallOption{
@@ -47,7 +47,7 @@ func NewTasksClient(log *slog.Logger, cfg config.ClientConfig) (*TasksClient, er
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &TasksClient{
+	return &Client{
 		client: tsks_pb.NewTasksClient(cc),
 		log:    log,
 	}, nil
@@ -64,7 +64,7 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-func (tc *TasksClient) GetPredictedTasks(ctx context.Context, taskIDs []int64) ([]*tsks_pb.PredictedTask, []int64, error) {
+func (tc *Client) GetPredictedTasks(ctx context.Context, taskIDs []int64) ([]*tsks_pb.PredictedTask, []int64, error) {
 	resp, err := tc.client.GetPredictedTasks(ctx, &tsks_pb.TasksIDs{
 		IDs: taskIDs,
 	})
@@ -82,7 +82,7 @@ func (tc *TasksClient) GetPredictedTasks(ctx context.Context, taskIDs []int64) (
 	return resp.Tasks, resp.UnpredictedUIDs, nil
 }
 
-func (tc *TasksClient) TaskExists(ctx context.Context, taskID, groupID int64) error {
+func (tc *Client) TaskExists(ctx context.Context, taskID, groupID int64) error {
 	_, err := tc.client.TaskExists(ctx, &tsks_pb.TaskExistsRequest{
 		TaskID:  taskID,
 		GroupID: groupID,

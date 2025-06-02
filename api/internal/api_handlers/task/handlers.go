@@ -5,14 +5,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/liriquew/control_system/internal/api_handlers/auth"
-	"github.com/liriquew/control_system/internal/api_handlers/groups"
-	groupsclient "github.com/liriquew/control_system/internal/grpc/clients/groups"
-	predictionsclient "github.com/liriquew/control_system/internal/grpc/clients/predictions"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
-	jsontools "github.com/liriquew/control_system/internal/lib/json_tools"
-	"github.com/liriquew/control_system/internal/models"
-	"github.com/liriquew/control_system/pkg/logger/sl"
+	"github.com/liriquew/control_system/api/internal/api_handlers/auth"
+	"github.com/liriquew/control_system/api/internal/api_handlers/groups"
+	groupsclient "github.com/liriquew/control_system/api/internal/grpc/clients/groups"
+	predictionsclient "github.com/liriquew/control_system/api/internal/grpc/clients/predictions"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
+	jsontools "github.com/liriquew/control_system/api/internal/lib/json_tools"
+	"github.com/liriquew/control_system/api/internal/models"
+	"github.com/liriquew/control_system/api/pkg/logger/sl"
 )
 
 type TaskAPI interface {

@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
 )
 
 type TaskID struct{}

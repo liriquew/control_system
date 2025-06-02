@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	authclient "github.com/liriquew/control_system/internal/grpc/clients/auth"
-	"github.com/liriquew/control_system/pkg/logger/sl"
+	authclient "github.com/liriquew/control_system/api/internal/grpc/clients/auth"
+	"github.com/liriquew/control_system/api/pkg/logger/sl"
 	"google.golang.org/grpc/metadata"
 )
 

@@ -6,24 +6,22 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/liriquew/control_system/graphs_service/internal/entities"
+	tasksclient "github.com/liriquew/control_system/graphs_service/internal/grpc/clients/tasks"
+	graphtools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools"
+	graph_wrapper "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/wrapper"
+	"github.com/liriquew/control_system/graphs_service/internal/models"
+	"github.com/liriquew/control_system/graphs_service/internal/repository"
+	"github.com/liriquew/control_system/graphs_service/pkg/logger/sl"
 	grph_pb "github.com/liriquew/control_system/services_protos/graphs_service"
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	"github.com/liriquew/graphs_service/internal/entities"
-	tasksclient "github.com/liriquew/graphs_service/internal/grpc/clients/tasks"
-	graphtools "github.com/liriquew/graphs_service/internal/lib/graph_tools"
-	graph_wrapper "github.com/liriquew/graphs_service/internal/lib/graph_tools/wrapper"
-	"github.com/liriquew/graphs_service/internal/models"
-	"github.com/liriquew/graphs_service/internal/repository"
-	"github.com/liriquew/graphs_service/pkg/logger/sl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"google.golang.org/grpc"
 )
 
-type graphsRepository interface {
+type Repository interface {
 	GetGraphGroup(ctx context.Context, graphID int64) (int64, error)
 
 	CreateGraph(ctx context.Context, graph *grph_pb.Graph, nodes []*grph_pb.Node) (int64, error)
@@ -50,26 +48,22 @@ type authClient interface {
 	Authenticate(context.Context, string) (int64, error)
 }
 
-type serverAPI struct {
+type Service struct {
 	grph_pb.UnimplementedGraphsServer
-	repository  graphsRepository
+	repository  Repository
 	log         *slog.Logger
 	tasksClient tasksClient
 }
 
-func Register(gRPC *grpc.Server, taskServiceAPI grph_pb.GraphsServer) {
-	grph_pb.RegisterGraphsServer(gRPC, taskServiceAPI)
-}
-
-func NewServerAPI(log *slog.Logger, graphsRepository graphsRepository, tc tasksClient) *serverAPI {
-	return &serverAPI{
+func New(log *slog.Logger, graphsRepository Repository, tc tasksClient) *Service {
+	return &Service{
 		log:         log,
 		repository:  graphsRepository,
 		tasksClient: tc,
 	}
 }
 
-func (s *serverAPI) authenticate(ctx context.Context) (int64, error) {
+func (s *Service) authenticate(ctx context.Context) (int64, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		s.log.Error("error while extracting metadata")
@@ -88,7 +82,7 @@ func (s *serverAPI) authenticate(ctx context.Context) (int64, error) {
 	return userID, nil
 }
 
-func (s *serverAPI) CreateGroupGraph(ctx context.Context, req *grph_pb.GraphWithNodes) (*grph_pb.GraphResponse, error) {
+func (s *Service) CreateGroupGraph(ctx context.Context, req *grph_pb.GraphWithNodes) (*grph_pb.GraphResponse, error) {
 	userID, err := s.authenticate(ctx)
 	if err != nil {
 		s.log.Error("error while authenticate user", sl.Err(err))
@@ -118,7 +112,7 @@ func (s *serverAPI) CreateGroupGraph(ctx context.Context, req *grph_pb.GraphWith
 	}, nil
 }
 
-func (s *serverAPI) ListGroupGraphs(ctx context.Context, req *grph_pb.ListGroupGraphsRequest) (*grph_pb.GraphListResponse, error) {
+func (s *Service) ListGroupGraphs(ctx context.Context, req *grph_pb.ListGroupGraphsRequest) (*grph_pb.GraphListResponse, error) {
 	graphs, err := s.repository.ListGroupGraphs(ctx, req.GroupID, req.Offset)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		s.log.Error("error while getting user's graphs", sl.Err(err))
@@ -138,7 +132,7 @@ func (s *serverAPI) ListGroupGraphs(ctx context.Context, req *grph_pb.ListGroupG
 	}, nil
 }
 
-func (s *serverAPI) GetGraph(ctx context.Context, req *grph_pb.GetGraphRequest) (*grph_pb.GraphWithNodes, error) {
+func (s *Service) GetGraph(ctx context.Context, req *grph_pb.GetGraphRequest) (*grph_pb.GraphWithNodes, error) {
 	graph, err := s.repository.GetGraph(ctx, req.GraphID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -155,7 +149,7 @@ func (s *serverAPI) GetGraph(ctx context.Context, req *grph_pb.GetGraphRequest) 
 	}, nil
 }
 
-func (s *serverAPI) GetNode(ctx context.Context, req *grph_pb.GetNodeRequest) (*grph_pb.NodeResponse, error) {
+func (s *Service) GetNode(ctx context.Context, req *grph_pb.GetNodeRequest) (*grph_pb.NodeResponse, error) {
 	node, err := s.repository.GetNode(ctx, req.GraphID, req.NodeID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -171,7 +165,7 @@ func (s *serverAPI) GetNode(ctx context.Context, req *grph_pb.GetNodeRequest) (*
 	}, nil
 }
 
-func (s *serverAPI) CreateNode(ctx context.Context, req *grph_pb.CreateNodeRequest) (*grph_pb.NodeResponse, error) {
+func (s *Service) CreateNode(ctx context.Context, req *grph_pb.CreateNodeRequest) (*grph_pb.NodeResponse, error) {
 	groupID, err := s.repository.GetGraphGroup(ctx, req.Node.GraphID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -214,7 +208,7 @@ func (s *serverAPI) CreateNode(ctx context.Context, req *grph_pb.CreateNodeReque
 	}, nil
 }
 
-func (s *serverAPI) UpdateNode(ctx context.Context, req *grph_pb.UpdateNodeRequest) (*emptypb.Empty, error) {
+func (s *Service) UpdateNode(ctx context.Context, req *grph_pb.UpdateNodeRequest) (*emptypb.Empty, error) {
 	groupID, err := s.repository.GetGraphGroup(ctx, req.Node.GraphID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -246,7 +240,7 @@ func (s *serverAPI) UpdateNode(ctx context.Context, req *grph_pb.UpdateNodeReque
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) RemoveNode(ctx context.Context, req *grph_pb.RemoveNodeRequest) (*emptypb.Empty, error) {
+func (s *Service) RemoveNode(ctx context.Context, req *grph_pb.RemoveNodeRequest) (*emptypb.Empty, error) {
 	if err := s.repository.RemoveNode(ctx, req.NodeID); err != nil && !errors.Is(err, repository.ErrNotExists) {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "node not found")
@@ -259,7 +253,7 @@ func (s *serverAPI) RemoveNode(ctx context.Context, req *grph_pb.RemoveNodeReque
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) GetDependencies(ctx context.Context, req *grph_pb.GetDependenciesRequest) (*grph_pb.NodeWithDependencies, error) {
+func (s *Service) GetDependencies(ctx context.Context, req *grph_pb.GetDependenciesRequest) (*grph_pb.NodeWithDependencies, error) {
 	node, err := s.repository.GetDependencies(ctx, req.NodeID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -275,7 +269,7 @@ func (s *serverAPI) GetDependencies(ctx context.Context, req *grph_pb.GetDepende
 	}, nil
 }
 
-func (s *serverAPI) AddDependency(ctx context.Context, req *grph_pb.DependencyRequest) (*emptypb.Empty, error) {
+func (s *Service) AddDependency(ctx context.Context, req *grph_pb.DependencyRequest) (*emptypb.Empty, error) {
 	if err := s.repository.AddDependency(ctx, req.GraphID, req.Dependency); err != nil {
 		if errors.Is(err, repository.ErrNotExists) {
 			return nil, status.Error(codes.NotFound, err.Error())
@@ -294,7 +288,7 @@ func (s *serverAPI) AddDependency(ctx context.Context, req *grph_pb.DependencyRe
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) RemoveDependency(ctx context.Context, req *grph_pb.DependencyRequest) (*emptypb.Empty, error) {
+func (s *Service) RemoveDependency(ctx context.Context, req *grph_pb.DependencyRequest) (*emptypb.Empty, error) {
 	if err := s.repository.RemoveDependensy(ctx, req.Dependency); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "node not found")
@@ -307,7 +301,7 @@ func (s *serverAPI) RemoveDependency(ctx context.Context, req *grph_pb.Dependenc
 	return &emptypb.Empty{}, nil
 }
 
-func (s *serverAPI) PredictGraph(ctx context.Context, req *grph_pb.PredictGraphRequest) (*grph_pb.PredictedGraphResponse, error) {
+func (s *Service) PredictGraph(ctx context.Context, req *grph_pb.PredictGraphRequest) (*grph_pb.PredictedGraphResponse, error) {
 	graph, err := s.repository.GetGraph(ctx, req.GraphID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -377,7 +371,7 @@ func (s *serverAPI) PredictGraph(ctx context.Context, req *grph_pb.PredictGraphR
 	return predictableGraph, nil
 }
 
-func (s *serverAPI) TaskInNode(ctx context.Context, req *grph_pb.TaskInNodeRequest) (*grph_pb.TaskInNodeResponse, error) {
+func (s *Service) TaskInNode(ctx context.Context, req *grph_pb.TaskInNodeRequest) (*grph_pb.TaskInNodeResponse, error) {
 	nodeID, err := s.repository.TaskInNode(ctx, req.TaskID)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		s.log.Error("error while searching task in node", sl.Err(err))

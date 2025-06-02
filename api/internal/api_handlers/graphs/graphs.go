@@ -3,8 +3,8 @@ package graphs
 import (
 	"log/slog"
 
-	graphsclient "github.com/liriquew/control_system/internal/grpc/clients/graphs"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
+	graphsclient "github.com/liriquew/control_system/api/internal/grpc/clients/graphs"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
 )
 
 type GraphsService struct {

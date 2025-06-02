@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/liriquew/auth_service/internal/lib/config"
-	"github.com/liriquew/auth_service/internal/service/auth"
-	"github.com/liriquew/auth_service/pkg/logger/sl"
+	"github.com/liriquew/control_system/auth_service/internal/lib/config"
+	"github.com/liriquew/control_system/auth_service/internal/service/auth"
+	"github.com/liriquew/control_system/auth_service/pkg/logger/sl"
 
-	grpcapp "github.com/liriquew/auth_service/internal/app/grpc_app"
-	auth_repository "github.com/liriquew/auth_service/internal/repository"
+	grpcapp "github.com/liriquew/control_system/auth_service/internal/app/grpc_app"
+	"github.com/liriquew/control_system/auth_service/internal/repository"
 )
 
 type App struct {
@@ -19,14 +19,14 @@ type App struct {
 }
 
 func New(log *slog.Logger, cfg config.AppConfig) *App {
-	storage, err := auth_repository.NewAuthRepository(cfg.Storage)
+	storage, err := repository.New(cfg.Storage)
 	if err != nil {
 		panic(err)
 	}
 
-	tasksService := auth.NewServerAPI(log, storage)
+	service := auth.NewServerAPI(log, storage)
 
-	app := grpcapp.New(log, tasksService, cfg.ServiceConfig.Port)
+	app := grpcapp.New(log, service, cfg.ServiceConfig.Port)
 
 	mainApp := &App{GRPCServer: app, log: log}
 	mainApp.closers = append(mainApp.closers, storage.Close)

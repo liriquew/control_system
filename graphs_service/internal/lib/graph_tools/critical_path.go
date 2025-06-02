@@ -7,9 +7,9 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/liriquew/graphs_service/internal/entities"
-	graph_tools_interface "github.com/liriquew/graphs_service/internal/lib/graph_tools/tools_interface"
-	"github.com/liriquew/graphs_service/internal/models"
+	"github.com/liriquew/control_system/graphs_service/internal/entities"
+	graph_tools_interface "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
+	"github.com/liriquew/control_system/graphs_service/internal/models"
 )
 
 const dummyNodeID int64 = -1
@@ -51,21 +51,21 @@ func init() {
 func addPriorityDependencies(graph graph_tools_interface.GraphWithNodes, nodesValueMap map[int64]float64, lf less) {
 	workerTasks := make(map[int64][]graph_tools_interface.Node)
 
-	// Группируем задачи по исполнителям
+	// группируем задачи по исполнителям
 	for _, node := range graph.GetNodes() {
 		if assignedTo := node.GetAssignedTo(); assignedTo != 0 {
 			workerTasks[assignedTo] = append(workerTasks[assignedTo], node)
 		}
 	}
 
-	// Сортируем задачи по убыванию длительности и добавляем зависимости
+	// сортируем задачи по убыванию длительности и добавляем зависимости
 	for _, tasks := range workerTasks {
-		// Сортировка по приоритету (здесь — по длительности)
+		// сортировка по приоритету (здесь — по длительности)
 		sort.SliceStable(tasks, func(i, j int) bool {
 			return lf(tasks[i], tasks[j])
 		})
 
-		// Добавляем рёбра между последовательными задачами
+		// добавляем рёбра между последовательными задачами
 		for i := 0; i < len(tasks)-1; i++ {
 			current := tasks[i]
 			next := tasks[i+1]
@@ -86,7 +86,7 @@ func getLastNodes(adjacencyList map[int64][]int64) []int64 {
 	return res
 }
 
-func FindCriticalPath(graph graph_tools_interface.GraphWithNodes, nodesValueMap map[int64]float64) ([][]int64, error) {
+func FindCriticalPath[T graph_tools_interface.GraphWithNodes](graph T, nodesValueMap map[int64]float64) ([][]int64, error) {
 	if HasCycle(graph) {
 		return nil, ErrCycleInGraph
 	}

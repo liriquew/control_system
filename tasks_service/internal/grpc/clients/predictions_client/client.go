@@ -11,21 +11,21 @@ import (
 
 	prdt_pb "github.com/liriquew/control_system/services_protos/predictions_service"
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	"github.com/liriquew/tasks_service/internal/lib/config"
-	"github.com/liriquew/tasks_service/internal/models"
-	"github.com/liriquew/tasks_service/pkg/logger/sl"
+	"github.com/liriquew/control_system/tasks_service/internal/lib/config"
+	"github.com/liriquew/control_system/tasks_service/internal/models"
+	"github.com/liriquew/control_system/tasks_service/pkg/logger/sl"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
-type PredicionsClient struct {
+type Client struct {
 	client prdt_pb.PredictionsClient
 	log    *slog.Logger
 }
 
-func NewPredictionsClient(log *slog.Logger, cfg config.ClientConfig) (*PredicionsClient, error) {
+func New(log *slog.Logger, cfg config.ClientConfig) (*Client, error) {
 	const op = "predictionsclient.New"
 
 	retryOpts := []grpcretry.CallOption{
@@ -50,7 +50,7 @@ func NewPredictionsClient(log *slog.Logger, cfg config.ClientConfig) (*Predicion
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &PredicionsClient{
+	return &Client{
 		client: prdt_pb.NewPredictionsClient(cc),
 		log:    log,
 	}, nil
@@ -67,7 +67,7 @@ var (
 	ErrInternal = errors.New("internal")
 )
 
-func (c *PredicionsClient) Predict(ctx context.Context, task *models.Task) (float64, error) {
+func (c *Client) Predict(ctx context.Context, task *models.Task) (float64, error) {
 	var userID int64
 	if task.GroupID.Int64 != 0 {
 		userID = task.AssignedTo.Int64
@@ -86,7 +86,7 @@ func (c *PredicionsClient) Predict(ctx context.Context, task *models.Task) (floa
 	return predicted.ActualTime, nil
 }
 
-func (c *PredicionsClient) PredictList(ctx context.Context, tasks []*models.Task) ([]*tsks_pb.PredictedTask, []int64, error) {
+func (c *Client) PredictList(ctx context.Context, tasks []*models.Task) ([]*tsks_pb.PredictedTask, []int64, error) {
 	timesToPredict := make([]*prdt_pb.PredictInfo, 0, len(tasks))
 	taskTimesMap := make(map[int64]float64, len(tasks))
 	for _, task := range tasks {

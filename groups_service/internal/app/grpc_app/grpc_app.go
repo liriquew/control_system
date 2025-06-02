@@ -7,7 +7,6 @@ import (
 	"net"
 
 	grps_pb "github.com/liriquew/control_system/services_protos/groups_service"
-	group_server "github.com/liriquew/groups_service/internal/service/groups"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -22,7 +21,7 @@ type App struct {
 	port       int
 }
 
-func New(log *slog.Logger, groupsService grps_pb.GroupsServer, port int) *App {
+func New(log *slog.Logger, service grps_pb.GroupsServer, port int) *App {
 	loggingOpts := []logging.Option{
 		logging.WithLogOnEvents(
 			logging.PayloadReceived, logging.PayloadSent,
@@ -42,7 +41,7 @@ func New(log *slog.Logger, groupsService grps_pb.GroupsServer, port int) *App {
 		logging.UnaryServerInterceptor(InterceptorLogger(log), loggingOpts...),
 	))
 
-	group_server.Register(gRPCServer, groupsService)
+	grps_pb.RegisterGroupsServer(gRPCServer, service)
 
 	return &App{
 		log:        log,

@@ -9,8 +9,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/liriquew/control_system/internal/api_handlers/auth"
-	groupsclient "github.com/liriquew/control_system/internal/grpc/clients/groups"
+	"github.com/liriquew/control_system/api/internal/api_handlers/auth"
+	groupsclient "github.com/liriquew/control_system/api/internal/grpc/clients/groups"
 )
 
 type GroupID struct{}

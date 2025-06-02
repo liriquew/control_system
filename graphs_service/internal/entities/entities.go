@@ -1,8 +1,8 @@
 package entities
 
 import (
+	"github.com/liriquew/control_system/graphs_service/internal/models"
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	"github.com/liriquew/graphs_service/internal/models"
 )
 
 type GraphWithNodes struct {

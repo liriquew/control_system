@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	tsks_pb "github.com/liriquew/control_system/services_protos/tasks_service"
-	"github.com/liriquew/tasks_service/internal/lib/config"
-	"github.com/liriquew/tasks_service/internal/models"
+	"github.com/liriquew/control_system/tasks_service/internal/lib/config"
+	"github.com/liriquew/control_system/tasks_service/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -31,7 +31,7 @@ const (
 	taskDeleteOperation = "delete"
 )
 
-func NewTaskRepository(cfg config.StorageConfig) (*TaskRepository, error) {
+func New(cfg config.StorageConfig) (*TaskRepository, error) {
 	const op = "storage.postgres.New"
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
@@ -102,7 +102,7 @@ func (s *TaskRepository) SaveTask(ctx context.Context, task *tsks_pb.Task) (int6
 
 func (s *TaskRepository) GetGroupTasks(ctx context.Context, groupID int64) ([]*models.Task, error) {
 	query := `
-	SELECT t.id, t.created_by, t.title, t.description, t.planned_time, 
+	SELECT t.id, t.created_by, t.title, t.description, t.planned_time,
 		t.actual_time, t.created_at, t.tags,
 		tg.group_id, tg.assigned_to
 	FROM tasks t JOIN tasks_groups tg ON t.id = tg.task_id WHERE tg.group_id=$1`
@@ -121,7 +121,7 @@ func (s *TaskRepository) GetGroupTasks(ctx context.Context, groupID int64) ([]*m
 
 func (s *TaskRepository) GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) {
 	query := `
-	SELECT 
+	SELECT
 		t.id, t.created_by, t.title, t.description, t.planned_time, t.actual_time, t.created_at, t.tags,
 		tg.group_id, tg.assigned_to
 	FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id WHERE t.id=$1
@@ -142,11 +142,11 @@ func (s *TaskRepository) GetTaskByID(ctx context.Context, taskID int64) (*models
 
 func (s *TaskRepository) GetTaskList(ctx context.Context, userID, offset int64) ([]*models.Task, error) {
 	query := `
-	SELECT 
-		t.id, t.created_by, t.title, t.description, 
-		t.planned_time, t.actual_time, t.created_at, t.tags, 
+	SELECT
+		t.id, t.created_by, t.title, t.description,
+		t.planned_time, t.actual_time, t.created_at, t.tags,
 		tg.group_id, tg.assigned_to
-	FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id WHERE t.created_by=$1 OR tg.assigned_to=$1 
+	FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id WHERE t.created_by=$1 OR tg.assigned_to=$1
 	ORDER BY t.created_at DESC
 	OFFSET $2 LIMIT $3
 	`
@@ -308,7 +308,7 @@ func (s *TaskRepository) UpdateGroupTask(ctx context.Context, task *tsks_pb.Task
 
 func (s *TaskRepository) DeleteUserTask(ctx context.Context, userID, taskID int64) error {
 	query := `
-	DELETE FROM tasks 
+	DELETE FROM tasks
 	WHERE id=$1 AND created_by=$2`
 
 	txn, err := s.db.Begin()
@@ -392,11 +392,11 @@ func (s *TaskRepository) TaskInGroup(ctx context.Context, groupID, taskID int64)
 
 func (s *TaskRepository) GetTasks(ctx context.Context, tasksIDs []int64) ([]*models.Task, error) {
 	query := `
-		SELECT 
-			t.id, t.created_by, t.title, t.description, 
+		SELECT
+			t.id, t.created_by, t.title, t.description,
 			t.planned_time, t.actual_time, t.created_at, t.tags,
 			tg.group_id, tg.assigned_to
-		FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id 
+		FROM tasks t LEFT JOIN tasks_groups tg ON t.id = tg.task_id
 		WHERE id = ANY($1)
 	`
 
@@ -420,8 +420,8 @@ func (s *TaskRepository) GetTasksToProduce(ctx context.Context) ([]*models.TaskP
 			ob.id AS outbox_id,
 			t.id, t.planned_time, t.actual_time, t.tags,
 			CASE
-				WHEN tg.group_id is not null THEN tg.assigned_to 
-				ELSE t.created_by 
+				WHEN tg.group_id is not null THEN tg.assigned_to
+				ELSE t.created_by
 			END AS user_id
 		FROM tasks t
 		JOIN outbox ob ON t.id = ob.task_id

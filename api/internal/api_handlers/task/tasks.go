@@ -3,9 +3,9 @@ package task
 import (
 	"log/slog"
 
-	groupsclient "github.com/liriquew/control_system/internal/grpc/clients/groups"
-	predictionsclient "github.com/liriquew/control_system/internal/grpc/clients/predictions"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
+	groupsclient "github.com/liriquew/control_system/api/internal/grpc/clients/groups"
+	predictionsclient "github.com/liriquew/control_system/api/internal/grpc/clients/predictions"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
 )
 
 type TasksService struct {

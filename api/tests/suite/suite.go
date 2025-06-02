@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/liriquew/control_system/internal/lib/config"
+	"github.com/liriquew/control_system/api/internal/lib/config"
 )
 
 type Suite struct {

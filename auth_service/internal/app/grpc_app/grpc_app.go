@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net"
 
-	auth_server "github.com/liriquew/auth_service/internal/service/auth"
+	auth_service "github.com/liriquew/control_system/auth_service/internal/service/auth"
 	auth_pb "github.com/liriquew/control_system/services_protos/auth_service"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -22,8 +22,7 @@ type App struct {
 	port       int
 }
 
-// New creates new gRPC server app.
-func New(log *slog.Logger, tasksService auth_pb.AuthServer, port int) *App {
+func New(log *slog.Logger, service auth_pb.AuthServer, port int) *App {
 	loggingOpts := []logging.Option{
 		logging.WithLogOnEvents(
 			logging.PayloadReceived, logging.PayloadSent,
@@ -31,7 +30,7 @@ func New(log *slog.Logger, tasksService auth_pb.AuthServer, port int) *App {
 	}
 
 	recoveryOpts := []recovery.Option{
-		recovery.WithRecoveryHandler(func(p interface{}) (err error) {
+		recovery.WithRecoveryHandler(func(p any) (err error) {
 			log.Error("Recovered from panic", slog.Any("panic", p))
 
 			return status.Errorf(codes.Internal, "internal error")
@@ -43,7 +42,7 @@ func New(log *slog.Logger, tasksService auth_pb.AuthServer, port int) *App {
 		logging.UnaryServerInterceptor(InterceptorLogger(log), loggingOpts...),
 	))
 
-	auth_server.Register(gRPCServer, tasksService)
+	auth_service.Register(gRPCServer, service)
 
 	return &App{
 		log:        log,

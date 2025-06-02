@@ -1,7 +1,7 @@
 package converter
 
 import (
-	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/api/internal/models"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	grps_pb "github.com/liriquew/control_system/services_protos/groups_service"

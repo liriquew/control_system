@@ -1,4 +1,4 @@
-module github.com/liriquew/auth_service
+module github.com/liriquew/control_system/auth_service
 
 go 1.24.1
 

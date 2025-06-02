@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/liriquew/control_system/internal/models"
+	"github.com/liriquew/control_system/api/internal/models"
 )
 
 type GraphWithNodes struct {

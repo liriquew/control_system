@@ -3,9 +3,9 @@ package groups
 import (
 	"log/slog"
 
-	authclient "github.com/liriquew/control_system/internal/grpc/clients/auth"
-	groupsclient "github.com/liriquew/control_system/internal/grpc/clients/groups"
-	tasksclient "github.com/liriquew/control_system/internal/grpc/clients/tasks"
+	authclient "github.com/liriquew/control_system/api/internal/grpc/clients/auth"
+	groupsclient "github.com/liriquew/control_system/api/internal/grpc/clients/groups"
+	tasksclient "github.com/liriquew/control_system/api/internal/grpc/clients/tasks"
 )
 
 type GroupsService struct {

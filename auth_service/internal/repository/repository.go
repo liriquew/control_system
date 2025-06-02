@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/liriquew/auth_service/internal/lib/config"
-	"github.com/liriquew/auth_service/internal/models"
+	"github.com/liriquew/control_system/auth_service/internal/lib/config"
+	"github.com/liriquew/control_system/auth_service/internal/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -23,9 +23,7 @@ type Repository struct {
 	db *sqlx.DB
 }
 
-const listTasksBatchSize = 10
-
-func NewAuthRepository(cfg config.StorageConfig) (*Repository, error) {
+func New(cfg config.StorageConfig) (*Repository, error) {
 	const op = "storage.postgres.New"
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
