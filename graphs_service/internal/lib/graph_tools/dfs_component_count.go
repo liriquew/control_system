@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	graph_tools_interface "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
+	graphinterface "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/graph_interface"
 )
 
 var (
 	ErrUnexpectedNodeInDeps = errors.New("got unexpected node in dependencies")
 )
 
-func CountConnectedComponents(graph graph_tools_interface.GraphWithNodes) (int, error) {
+func CountConnectedComponents(graph graphinterface.GraphWithNodes) (int, error) {
 	n := len(graph.GetNodes())
 	visited := make(map[int64]struct{}, n)
 

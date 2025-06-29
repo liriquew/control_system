@@ -1,19 +1,19 @@
 package graph_wrapper
 
 import (
-	grph_tools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
+	graphtools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/graph_interface"
 	grph_pb "github.com/liriquew/control_system/services_protos/graphs_service"
 )
 
 type WrapperPredictedGraph struct {
-	Nodes []grph_tools.Node
+	Nodes []graphtools.Node
 }
 
 func (w *WrapperPredictedGraph) Len() int {
 	return len(w.Nodes)
 }
 
-func (w *WrapperPredictedGraph) GetNodes() []grph_tools.Node {
+func (w *WrapperPredictedGraph) GetNodes() []graphtools.Node {
 	return w.Nodes
 }
 
@@ -48,14 +48,14 @@ func (wn *WrappedNode) AddAdditionalDependency(ids ...int64) {
 	wn.Node.AdditionalDependencies = append(wn.Node.AdditionalDependencies, ids...)
 }
 
-func WrapNode(node *grph_pb.NodeWithTask) grph_tools.Node {
+func WrapNode(node *grph_pb.NodeWithTask) graphtools.Node {
 	return &WrappedNode{
 		Node: node,
 	}
 }
 
-func WrapPredictedGraph(g *grph_pb.PredictedGraphResponse) grph_tools.GraphWithNodes {
-	n := make([]grph_tools.Node, len(g.Nodes))
+func WrapPredictedGraph(g *grph_pb.PredictedGraphResponse) graphtools.GraphWithNodes {
+	n := make([]graphtools.Node, len(g.Nodes))
 	for i, node := range g.Nodes {
 		n[i] = WrapNode(node)
 	}

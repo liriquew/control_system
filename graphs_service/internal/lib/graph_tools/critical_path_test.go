@@ -81,6 +81,7 @@ func TestFindCriticalPath(t *testing.T) {
 							ID:                1,
 							DependencyNodeIDs: []int64{2, 3},
 							AssignedTo:        ptrInt64(1),
+							Weight:            1,
 						},
 					},
 					{
@@ -88,6 +89,7 @@ func TestFindCriticalPath(t *testing.T) {
 							ID:                2,
 							DependencyNodeIDs: []int64{},
 							AssignedTo:        ptrInt64(2),
+							Weight:            2,
 						},
 					},
 					{
@@ -95,11 +97,12 @@ func TestFindCriticalPath(t *testing.T) {
 							ID:                3,
 							DependencyNodeIDs: []int64{},
 							AssignedTo:        ptrInt64(2),
+							Weight:            3,
 						},
 					},
 				},
 			},
-			criticalPathNodesIDs: [][]int64{{1, 3}, {1, 2, 3}},
+			criticalPathNodesIDs: [][]int64{{1, 2}, {1, 3}, {1, 2, 3}},
 			nodesValueMap: map[int64]float64{
 				1: 1, 2: 2, 3: 3,
 			},
@@ -280,6 +283,112 @@ func TestFindCriticalPath(t *testing.T) {
 			criticalPathNodesIDs: [][]int64{{1, 2, 5, 6}, {1, 3, 5, 6}, {1, 2, 3, 5, 6}},
 			nodesValueMap: map[int64]float64{
 				1: 1, 2: 4, 3: 3, 4: 1, 5: 2, 6: 3,
+			},
+		},
+		{
+			name: "Interval Feature test; no worker interval intersection",
+			graph: entities.GraphWithTasks{
+				Nodes: []*entities.NodeWithTask{
+					{
+						Node: &models.Node{
+							ID:                1,
+							DependencyNodeIDs: []int64{2, 3},
+							AssignedTo:        ptrInt64(1),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                2,
+							DependencyNodeIDs: []int64{},
+							AssignedTo:        ptrInt64(2),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                3,
+							DependencyNodeIDs: []int64{4},
+							AssignedTo:        ptrInt64(3),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                4,
+							DependencyNodeIDs: []int64{5},
+							AssignedTo:        ptrInt64(2),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                5,
+							DependencyNodeIDs: []int64{},
+							AssignedTo:        ptrInt64(4),
+							Weight:            1,
+						},
+					},
+				},
+			},
+			criticalPathNodesIDs: [][]int64{{1, 3, 4, 5}},
+			nodesValueMap: map[int64]float64{
+				1: 1, 2: 1, 3: 1, 4: 1, 5: 1,
+			},
+		},
+		{
+			// same test as "Interval Feature test; no worker interval intersection"
+			// (previous)
+			// but, node (id = 2) has Weight 10
+			// worker has interval intersection
+			name: "Interval Feature test; with worker interval intersection",
+			graph: entities.GraphWithTasks{
+				Nodes: []*entities.NodeWithTask{
+					{
+						Node: &models.Node{
+							ID:                1,
+							DependencyNodeIDs: []int64{2, 3},
+							AssignedTo:        ptrInt64(1),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                2,
+							DependencyNodeIDs: []int64{},
+							AssignedTo:        ptrInt64(2),
+							Weight:            10,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                3,
+							DependencyNodeIDs: []int64{4},
+							AssignedTo:        ptrInt64(3),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                4,
+							DependencyNodeIDs: []int64{5},
+							AssignedTo:        ptrInt64(2),
+							Weight:            1,
+						},
+					},
+					{
+						Node: &models.Node{
+							ID:                5,
+							DependencyNodeIDs: []int64{},
+							AssignedTo:        ptrInt64(4),
+							Weight:            1,
+						},
+					},
+				},
+			},
+			criticalPathNodesIDs: [][]int64{{1, 2}, {1, 2, 4, 5}},
+			nodesValueMap: map[int64]float64{
+				1: 1, 2: 10, 3: 1, 4: 1, 5: 1,
 			},
 		},
 	}

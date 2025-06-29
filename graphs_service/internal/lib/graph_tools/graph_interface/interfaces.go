@@ -1,4 +1,4 @@
-package graph_tools_interface
+package graphtools
 
 type GraphWithNodes interface {
 	Len() int

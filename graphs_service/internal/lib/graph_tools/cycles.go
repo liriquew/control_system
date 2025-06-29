@@ -1,11 +1,11 @@
 package graphtools
 
-import grph_tools "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/tools_interface"
+import graphinterface "github.com/liriquew/control_system/graphs_service/internal/lib/graph_tools/graph_interface"
 
 // HasCycle - возвращает true, если граф содержит цикл, false в противном случае
 // для обнаружения цикла использует топологическую сортировку
-func HasCycle(graph grph_tools.GraphWithNodes) (has bool) {
-	visited := make(map[int64]interface{}, graph.Len())
+func HasCycle(graph graphinterface.GraphWithNodes) (has bool) {
+	visited := make(map[int64]struct{}, graph.Len())
 
 	g := make(map[int64][]int64, graph.Len())
 	for _, node := range graph.GetNodes() {
