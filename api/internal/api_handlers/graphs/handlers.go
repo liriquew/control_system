@@ -309,8 +309,9 @@ func (g *Graphs) RemoveDependency(w http.ResponseWriter, r *http.Request) {
 
 func (g *Graphs) PredictGraph(w http.ResponseWriter, r *http.Request) {
 	graphID := r.Context().Value(GraphID{}).(int64)
+	priority := r.Context().Value(Priority{}).(int64)
 
-	predictedGraph, err := g.graphsClient.PredictGraph(r.Context(), graphID)
+	predictedGraph, err := g.graphsClient.PredictGraph(r.Context(), graphID, int(priority))
 	if err != nil {
 		if errors.Is(err, graphsclient.ErrNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)

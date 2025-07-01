@@ -81,7 +81,7 @@ type GraphClient interface {
 	GetDependencies(ctx context.Context, graphID, nodeID int64) (*models.Node, error)
 	AddDependency(ctx context.Context, dep *models.Dependency) error
 	RemoveDependency(ctx context.Context, dep *models.Dependency) error
-	PredictGraph(ctx context.Context, graphID int64) (*entities.PredictedGraph, error)
+	PredictGraph(ctx context.Context, graphID int64, priority int) (*entities.PredictedGraph, error)
 	TaskInNode(ctx context.Context, taskID int64) (int64, error)
 }
 
@@ -269,9 +269,10 @@ func (c *GRPCGraphClient) RemoveDependency(ctx context.Context, dep *models.Depe
 	return nil
 }
 
-func (c *GRPCGraphClient) PredictGraph(ctx context.Context, graphID int64) (*entities.PredictedGraph, error) {
+func (c *GRPCGraphClient) PredictGraph(ctx context.Context, graphID int64, priority int) (*entities.PredictedGraph, error) {
 	resp, err := c.client.PredictGraph(ctx, &grph_pb.PredictGraphRequest{
-		GraphID: graphID,
+		GraphID:  graphID,
+		Priority: grph_pb.Priority(priority),
 	})
 	if err != nil {
 		if st, ok := status.FromError(err); ok {

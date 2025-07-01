@@ -106,8 +106,14 @@ message DependencyRequest {
     Dependency Dependency = 2;
 }
 
+enum Priority {
+  MinTime = 0;
+  MaxTime = 1;
+}
+
 message PredictGraphRequest {
     int64 GraphID = 1;
+    Priority Priority = 2;
 }
 
 message NodeWithTask {

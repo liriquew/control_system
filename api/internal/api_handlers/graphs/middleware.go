@@ -12,6 +12,7 @@ import (
 type GraphID struct{}
 type NodeID struct{}
 type DependencyNodeID struct{}
+type Priority struct{}
 
 type GraphsMiddleware struct {
 	log *slog.Logger
@@ -58,6 +59,15 @@ func (g *GraphsMiddleware) DependencyNodeIDGetter(next http.Handler) http.Handle
 		}
 
 		ctx := context.WithValue(r.Context(), DependencyNodeID{}, nodeID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (g *GraphsMiddleware) PriorityNodePredictGraphGetter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		priority, _ := strconv.ParseInt(chi.URLParam(r, "priority"), 10, 64)
+
+		ctx := context.WithValue(r.Context(), Priority{}, priority)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -397,7 +397,7 @@ func TestFindCriticalPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			done := make(chan bool)
 			go func() {
-				result, _ := FindCriticalPath(graph_wrapper.WrapGraphWithTasks(&tt.graph), tt.nodesValueMap)
+				result, _ := FindCriticalPath(graph_wrapper.WrapGraphWithTasks(&tt.graph), tt.nodesValueMap, int(MinTimePriority))
 				if !comparePaths(result, tt.criticalPathNodesIDs) {
 					t.Errorf("Expected %v, got %v", tt.criticalPathNodesIDs, result)
 				}

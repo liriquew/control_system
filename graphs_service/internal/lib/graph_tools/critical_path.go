@@ -11,18 +11,21 @@ import (
 	"github.com/liriquew/control_system/graphs_service/internal/models"
 )
 
+// Хранит состояние текущей вершины
 type nodeAmount struct {
-	min float64
-	max float64
-	graphinterface.Node
+	min                 float64 // Раннее начало (ES - early start)
+	max                 float64 // Позднее начало (LS - late start)
+	graphinterface.Node         // сама вершина
 }
 
+// Обновляет ES вершины
 func (n *nodeAmount) SetMin(val float64) {
 	if n.min > val {
 		n.min = val
 	}
 }
 
+// Обновляет LS вершины
 func (n *nodeAmount) SetMax(val float64) {
 	if n.max < val {
 		n.max = val
@@ -32,25 +35,34 @@ func (n *nodeAmount) SetMax(val float64) {
 type less func(graphinterface.Node, graphinterface.Node) bool
 
 const (
+	// Константы для выбора приоритета
 	MinTimePriority = iota
 	MaxTimePriority
 
+	// В случае, если есть несколько вершин, которые не имеют исходящих ребер,
+	// то есть несколько финальных вершин
+	// необходимо добавить вершину, которая будет аккумулировать состояния предыдущих
 	dummyNodeID int64 = -1
 )
 
+// Приоритеты
 var lessFuncMap map[int]less = map[int]less{
 	MinTimePriority: func(n1, n2 graphinterface.Node) bool {
+		// вершины с меньшим весом приоритетнее
 		return n1.GetWeight() < n2.GetWeight()
 	},
 	MaxTimePriority: func(n1, n2 graphinterface.Node) bool {
+		// вершины с большим весом приоритетнее
 		return n1.GetWeight() > n2.GetWeight()
 	},
 }
 
 var (
+	// Будет возвращено, в случае, если граф содержит цикл
 	ErrCycleInGraph = errors.New("cycle detected")
 )
 
+// Возвращает список индентификаторов вершин, которые не имеют исходящих ребер
 func getLastNodes(adjacencyList map[int64][]int64) []int64 {
 	res := []int64{}
 
@@ -63,8 +75,9 @@ func getLastNodes(adjacencyList map[int64][]int64) []int64 {
 	return res
 }
 
+// solver - хранит состояние алгоритма поиска критических путей
 type solver struct {
-	// мапа хранит состояние каждой вершины (EF, ES, node)
+	// Хранит состояние каждой вершины, ключ - идентификатор вершины
 	nodeAmountMap map[int64]*nodeAmount
 	// список смежности
 	adjacencyList map[int64][]int64
@@ -74,9 +87,14 @@ type solver struct {
 	nodesValueMap map[int64]float64
 
 	graph graphinterface.GraphWithNodes
+
+	// функция, задающая приоритет задач
+	// в случае, если выполнение каких-то задач накладывается
+	priorityFunc less
 }
 
-func newSolver(graph graphinterface.GraphWithNodes, nodesValueMap map[int64]float64) solver {
+// конструктор для структуры, которая хранит состояние алгоритма
+func newSolver(graph graphinterface.GraphWithNodes, nodesValueMap map[int64]float64, priority int) solver {
 	adjacencyList := make(map[int64][]int64, graph.Len())
 	adjacencyListInversed := make(map[int64][]int64, graph.Len())
 
@@ -97,6 +115,7 @@ func newSolver(graph graphinterface.GraphWithNodes, nodesValueMap map[int64]floa
 		adjacencyListInversed: adjacencyListInversed,
 		nodesValueMap:         nodesValueMap,
 		graph:                 graph,
+		priorityFunc:          lessFuncMap[priority],
 	}
 
 	s.dropState()
@@ -104,6 +123,8 @@ func newSolver(graph graphinterface.GraphWithNodes, nodesValueMap map[int64]floa
 	return s
 }
 
+// dropState - заполняет nodeAmountMap значениями по умолчанию
+// и добавляет последнюю вершину
 func (s *solver) dropState() {
 	s.nodeAmountMap = make(map[int64]*nodeAmount, s.graph.Len())
 	for _, node := range s.graph.GetNodes() {
@@ -117,14 +138,13 @@ func (s *solver) dropState() {
 	s.createLastNode()
 }
 
+// В случае, если есть несколько вершин, которые не имеют исходящих ребер
+// необходимо добавить последнюю вершину, в которой будет отображено время всего графа
 func (s *solver) createLastNode() {
-	// в случае, если есть несколько вершин, которые не имеют исходящих ребер
-	// необходимо добавить последнюю вершину, в которой будет отображено время всего графа
-
-	// find last nodes to add dummy node
+	// находим список последних вершин
 	lastNodes := getLastNodes(s.adjacencyList)
 
-	// create dummy node
+	// создаем вершину - аккумулятор
 	var dummyNodeAssignedToID int64 = -1
 	s.nodeAmountMap[dummyNodeID] = &nodeAmount{
 		Node: &entities.NodeWithTask{
@@ -135,30 +155,35 @@ func (s *solver) createLastNode() {
 	}
 
 	if len(lastNodes) == 1 && lastNodes[0] == -1 {
-		// already added, this is drop state call,
-		// just for init last node
+		// последняя вершина уже добавлена,
+		// этот вызов связан с тем, что структура графа была изменена
+		// вызов для того, чтобы добавить последнюю вершину
 		return
 	}
 
+	// добавляем последнюю вершину
 	s.adjacencyList[dummyNodeID] = []int64{}
 	s.adjacencyListInversed[dummyNodeID] = lastNodes
 	s.nodesValueMap[dummyNodeID] = 0.0
 
-	// connect dummy node to last nodes in graph
+	// добавляем ребра из последних вершин к добавляемой
 	for _, nodeID := range lastNodes {
 		node := s.nodeAmountMap[nodeID].Node
 		s.adjacencyList[node.GetID()] = append(s.adjacencyList[node.GetID()], dummyNodeID)
 	}
 }
 
+// forward - выполняет прямой ход алгоритма
 func (s *solver) forvard() {
-	// прямой ход
-	// log.Println(s.adjacencyList)
+	// сбрасываем состояние, добавляем последнюю вершниу
 	s.dropState()
+
+	// очередь рассматриваемых вершин
 	var queue []int64
+	// множество вершин, которые выполнены
 	doneNodesSet := make(map[int64]struct{}, len(s.nodesValueMap))
 
-	// определение начальных вершин
+	// Определение начальных вершин
 	for nodeID, inversedNodeDependencies := range s.adjacencyListInversed {
 		if len(inversedNodeDependencies) == 0 {
 			queue = append(queue, nodeID)
@@ -167,14 +192,14 @@ func (s *solver) forvard() {
 		}
 	}
 
-	// fmt.Println("FORWARD")
-
+	// использоваием алгоритма обхода графа в ширину,
+	// обходим все вершины, при этом обновляя ES и EF рассматриваемых вершин
 	for len(queue) > 0 {
 		var nextQueue []int64
-		// fmt.Println(queue)
 
 		for _, currNodeID := range queue {
-			// check is current node ready to done
+			// проверка, готова ли текущая вершина к выполнению
+			// для этого все предыдущие вершины должны быть выполнены
 			readyToDone := true
 			for _, prevNodeID := range s.adjacencyListInversed[currNodeID] {
 				if _, ok := doneNodesSet[prevNodeID]; !ok {
@@ -182,100 +207,82 @@ func (s *solver) forvard() {
 					break
 				}
 			}
+
+			// если вершина не готова к выполнению
+			// рассмотрим ее на следующей интерации
 			if !readyToDone {
 				nextQueue = append(nextQueue, currNodeID)
 				continue
 			}
 
+			// текущая вершина выполненена (так как все предыдущие вершины выполнены)
 			doneNodesSet[currNodeID] = struct{}{}
 
+			// обновляем состояние текущей вершины
 			currNodeAmount := s.nodeAmountMap[currNodeID]
 			currNodeTime := currNodeAmount.max + s.nodesValueMap[currNodeID]
 
-			// check next nodes is their previous nodes complete
-			// in any case mark them with time which current node achive
+			// обходим вершины, в которые можно перейти из текущей вершины
 			for _, nextNodeID := range s.adjacencyList[currNodeID] {
-				allPrevComplete := true
-				// fmt.Println(nextNodeID)
+				// обновляем состоние вершины
 				s.nodeAmountMap[nextNodeID].SetMax(currNodeTime)
-
-				for _, prevForNextNodeID := range s.adjacencyListInversed[nextNodeID] {
-					_, ok := doneNodesSet[prevForNextNodeID]
-					// fmt.Println("\t", prevForNextNodeID, ok)
-					allPrevComplete = allPrevComplete && ok
-				}
-
-				if allPrevComplete {
-					nextQueue = append(nextQueue, nextNodeID)
-				}
+				// добавляем в очередь
+				nextQueue = append(nextQueue, nextNodeID)
 			}
 		}
-		// for k, v := range s.nodeAmountMap {
-		// 	fmt.Println("\t", k, v.min, v.max)
-		// }
+		// обновляем очередь для следующей итерации
 		queue = nextQueue
 	}
 }
 
+// forward - выполняет прямой ход алгоритма
 func (s *solver) backward() {
+	// очередь рассматриваемых вершин,
+	// изначально в очереди аккумулирующая вершина
 	queue := []int64{dummyNodeID}
-	doneNodesSet := make(map[int64]struct{}, len(s.nodeAmountMap))
+
+	// обновляем состояние акуккумулирующей вершины,
+	// ее LS должен быть равен ES
 	s.nodeAmountMap[dummyNodeID].SetMin(s.nodeAmountMap[dummyNodeID].max)
 
-	// fmt.Println("BACKWARD")
-
+	// использоваием алгоритма обхода графа в ширину,
+	// обходим все вершины, при этом обновляя ES и EF рассматриваемых вершин
 	for len(queue) != 0 {
+		// очередь для следующей итерации
 		var nextQueue []int64
-		// fmt.Println(queue)
 		for _, currNodeID := range queue {
-			// check is current node ready to done
-			readyToDone := true
-			for _, prevNodeID := range s.adjacencyList[currNodeID] {
-				if _, ok := doneNodesSet[prevNodeID]; !ok {
-					readyToDone = false
-					break
-				}
-			}
-			if !readyToDone {
-				nextQueue = append(nextQueue, currNodeID)
-				continue
-			}
-
-			doneNodesSet[currNodeID] = struct{}{}
-
+			// получаем время текущей вершины (ee LS)
 			currNodeTime := s.nodeAmountMap[currNodeID].min
-			// check next nodes is their previous nodes complete
-			// in any case mark them with time which current node achive
+
 			for _, nextNodeID := range s.adjacencyListInversed[currNodeID] {
-				allPrevComplete := true
-
+				// для каждой предшествующей вершины
+				// LS = min(LS текущей - время выполнения текущей)
 				s.nodeAmountMap[nextNodeID].SetMin(currNodeTime - s.nodesValueMap[nextNodeID])
-				for _, prevForNextNodeID := range s.adjacencyList[nextNodeID] {
-					_, ok := doneNodesSet[prevForNextNodeID]
-					allPrevComplete = allPrevComplete && ok
-				}
 
-				if allPrevComplete {
-					nextQueue = append(nextQueue, nextNodeID)
-				}
+				// добавляем вершину в очередь
+				nextQueue = append(nextQueue, nextNodeID)
 			}
 		}
-		// for k, v := range s.nodeAmountMap {
-		// 	fmt.Println("\t", k, v.min, v.max)
-		// }
+		// обновляем очередь для следующей итерации
 		queue = nextQueue
 	}
 }
 
+// correctIntervals - выполняет корректировку в графе, добавляя ребра (зависимости)
+// в случае, если для какого-то исполнителя выявились накладывающиеся задачи
 func (s *solver) correctIntervals() (addedNewDependency bool) {
+	// Interval - хранит информацию о временном интервале, в котором исполнитель выполнял задачу
 	type Interval struct {
+		// начало и конец интервала
 		start, end float64
+		// вершина обозначающая задачу, которая выполняется в этом интервале
 		graphinterface.Node
 	}
+
 	workersTimeLine := make(map[int64][]Interval, len(s.nodesValueMap))
 
+	// группируем интервалы по исполнителям
 	for _, node := range s.nodeAmountMap {
-		// log.Println(node.GetAssignedTo(), node.GetID(), node.max, node.GetWeight())
 		workersTimeLine[node.GetAssignedTo()] = append(
 			workersTimeLine[node.GetAssignedTo()],
 			Interval{
@@ -287,7 +294,11 @@ func (s *solver) correctIntervals() (addedNewDependency bool) {
 	}
 
 	for _, intervals := range workersTimeLine {
+		// сортируем интервалы исполнителя
+		// по возрастанию времени начала интервала
 		sort.Slice(intervals, func(i, j int) bool {
+			// в случае, если начало интервалов совпадают,
+			// меньше тот, который раньше заканчивается
 			if intervals[i].start == intervals[j].start {
 				return intervals[i].end < intervals[j].end
 			}
@@ -296,13 +307,15 @@ func (s *solver) correctIntervals() (addedNewDependency bool) {
 		})
 
 		for i := range len(intervals) - 1 {
+			// в случае если конец текщуего интервала превосходит начало следующего
+			// добавляем в зависимости (i+1)-й задачи i-ю
 			if intervals[i].end > intervals[i+1].start {
-				// log.Println("add", intervals[i], intervals[i+1])
 				s.addDependency(
 					intervals[i].Node.GetID(),
 					intervals[i+1].Node.GetID(),
 				)
 
+				// отмечаем, что структура графа была изменена
 				addedNewDependency = true
 			}
 		}
@@ -311,17 +324,19 @@ func (s *solver) correctIntervals() (addedNewDependency bool) {
 	return
 }
 
+// addDependency - добавляет зависимость
+// toId будет зависеть от выполнения вершины с индетификатором fromId
 func (s *solver) addDependency(fromId, toId int64) {
 	s.adjacencyList[fromId] = append(s.adjacencyList[fromId], toId)
 	s.adjacencyListInversed[toId] = append(s.adjacencyListInversed[toId], fromId)
 }
 
+// collectPaths - собирает критические пути графа
 func (s *solver) collectPaths() [][]int64 {
-	// collect critical paths
 	var res [][]int64
 
-	// log.Println(s.adjacencyListInversed)
-
+	// рекурсивно, с помощью алгоритма поиска в грубину обходим граф
+	// и собираем вершины у которых ES == EF
 	var dfs func(int64, []int64)
 	dfs = func(node int64, curr []int64) {
 		if amount := s.nodeAmountMap[node]; amount.max == 0 && amount.min == amount.max {
@@ -333,6 +348,8 @@ func (s *solver) collectPaths() [][]int64 {
 		}
 
 		for _, nextNode := range s.adjacencyListInversed[node] {
+			// рассматриваем только те пути, которые содержат вершины ES == EF
+			// прочие вершины не формируют критический путь
 			if amount := s.nodeAmountMap[nextNode]; amount.min == amount.max {
 				dfs(nextNode, append(curr, nextNode))
 			}
@@ -344,23 +361,31 @@ func (s *solver) collectPaths() [][]int64 {
 	return res
 }
 
-func FindCriticalPath[T graphinterface.GraphWithNodes](graph T, nodesValueMap map[int64]float64) ([][]int64, error) {
+// FindCriticalPath - находит критические пути графа
+// graph - граф
+// nodesValueMap - определяет веса вершин
+func FindCriticalPath[T graphinterface.GraphWithNodes](graph T, nodesValueMap map[int64]float64, priority int) ([][]int64, error) {
+	// в случае, если в графе есть цикл, вернем ошибку
 	if HasCycle(graph) {
 		return nil, ErrCycleInGraph
 	}
 
-	solver := newSolver(graph, nodesValueMap)
+	solver := newSolver(graph, nodesValueMap, priority)
 
+	// выполняем рассчет прямого хода
 	solver.forvard()
 
+	// проверяем наличие накладывающихся задач
 	if graphChanged := solver.correctIntervals(); graphChanged {
-		// if graph corrected (added new dependencies)
-		// calculate forward part again
+		// если граф был изменен (были накладывающиеся задачи)
+		// необходимо вычислить прямой ход повторно
 		solver.forvard()
 	}
 
+	// рассчет обратного хода
 	solver.backward()
 
+	// сбор критических путей
 	res := solver.collectPaths()
 
 	return res, nil

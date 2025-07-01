@@ -352,7 +352,7 @@ func (s *Service) PredictGraph(ctx context.Context, req *grph_pb.PredictGraphReq
 		nodesValuesMap[node.Node.ID] = node.PredictedTime
 	}
 
-	paths, err := graphtools.FindCriticalPath(graph_wrapper.WrapPredictedGraph(predictableGraph), nodesValuesMap)
+	paths, err := graphtools.FindCriticalPath(graph_wrapper.WrapPredictedGraph(predictableGraph), nodesValuesMap, int(req.Priority))
 	if err != nil {
 		if errors.Is(err, graphtools.ErrCycleInGraph) {
 			return nil, status.Error(codes.FailedPrecondition, "cycle found in graph")
