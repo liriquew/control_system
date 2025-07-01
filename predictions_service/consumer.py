@@ -19,12 +19,12 @@ class KafkaMLConsumer:
             "group.id": cfg["group_id"],
             "auto.offset.reset": "earliest",
             "enable.auto.commit": True,
-            "fetch.min.bytes": 1,         # Минимум данных для возврата
-            "fetch.wait.max.ms": 100,     # Макс время ожидания новых данных
-            "queued.min.messages": 10000,  # Минимум сообщений в локальной очереди
+            "fetch.min.bytes": 1,
+            "fetch.wait.max.ms": 100,
+            "queued.min.messages": 10000,
         })
         self._topic = cfg["topic"]
-        
+
         self._consumer_delete = Consumer({
             "bootstrap.servers": cfg["bootstrap_servers"],
             "group.id": cfg["group_id"],
@@ -32,7 +32,7 @@ class KafkaMLConsumer:
             "enable.auto.commit": True
         })
         self._topic_delete = cfg["delete_topic"]
-        
+
         self._db = db
 
         self._logger = logging.getLogger(__name__)
@@ -48,17 +48,20 @@ class KafkaMLConsumer:
         self._thread_pred_data_delete.start()
 
     def consume_prediction_data(self):
+        """
+        Извлекает сообщения о завершении задач из брокера сообщений
+        """
         self._consumer.subscribe([self._topic])
-        
+
         try:
             while True:
                 msg = self._consumer.poll(0.001)
-                
+
                 if msg is None:
                     continue
                 if msg.error():
                     raise KafkaException(msg.error())
-                
+
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
                     self._logger.info(f"recieved message: {data}")
@@ -74,17 +77,20 @@ class KafkaMLConsumer:
             self._consumer.close()
 
     def consume_prediction_data_delete(self):
+        """
+        Извлекает сообщения об удалении задач из брокера сообщений
+        """
         self._consumer_delete.subscribe([self._topic_delete])
-        
+
         try:
             while True:
                 msg = self._consumer_delete.poll(0.001)
-                
+
                 if msg is None:
                     continue
                 if msg.error():
                     raise KafkaException(msg.error())
-                
+
                 try:
                     data = json.loads(msg.value().decode("utf-8"))
                     self._logger.info(f"recieved message: {data}")
@@ -98,4 +104,3 @@ class KafkaMLConsumer:
             self._logger.info("Consumer stopped by user")
         finally:
             self._consumer_delete.close()
-
