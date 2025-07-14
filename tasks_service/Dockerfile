@@ -2,12 +2,14 @@ FROM golang:1.24 AS build-stage
 
 WORKDIR /app
 
-COPY tasks_service ./tasks_service/
+COPY tasks_service/go.mod tasks_service/go.sum ./tasks_service/
 
 # required for build (../ replace in go.mod)
 COPY service_protos ./service_protos/
 
 RUN cd tasks_service && go mod download && cd ..
+
+COPY tasks_service ./tasks_service/
 
 RUN cd tasks_service && CGO_ENABLED=0 GOOS=linux go build -o /tasks_service cmd/main.go
 
