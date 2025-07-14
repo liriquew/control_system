@@ -311,7 +311,10 @@ func (g *Graphs) PredictGraph(w http.ResponseWriter, r *http.Request) {
 	graphID := r.Context().Value(GraphID{}).(int64)
 	priority := r.Context().Value(Priority{}).(int64)
 
+	g.log.Info("query info", slog.Int64("id", graphID), slog.Int64("priority", priority))
+
 	predictedGraph, err := g.graphsClient.PredictGraph(r.Context(), graphID, int(priority))
+	g.log.Info("graph", predictedGraph)
 	if err != nil {
 		if errors.Is(err, graphsclient.ErrNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)

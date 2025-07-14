@@ -87,7 +87,7 @@ func New(
 
 					r.With(graphsAPI.GraphIDGetter).Route("/{graphID}", func(r chi.Router) {
 						r.With(groupsAPI.CheckMemberPermission).Get("/", http.HandlerFunc(graphsAPI.GetGraph))
-						r.With(groupsAPI.CheckMemberPermission).Get("/predict", http.HandlerFunc(graphsAPI.PredictGraph))
+						r.With(groupsAPI.CheckMemberPermission, graphsAPI.PriorityNodePredictGraphGetter).Get("/predict", http.HandlerFunc(graphsAPI.PredictGraph))
 
 						r.Route("/nodes", func(r chi.Router) {
 							r.With(groupsAPI.CheckEditorPermission).Post("/", http.HandlerFunc(graphsAPI.CreateNode))

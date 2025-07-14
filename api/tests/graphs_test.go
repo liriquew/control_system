@@ -973,7 +973,7 @@ func TestRemoveDependency(t *testing.T) {
 	assert.Len(t, dependencies.DependencyNodeIDs, 0)
 }
 
-func aTestPredictGraph(t *testing.T) {
+func TestPredictGraph(t *testing.T) {
 	ts := suite.New(t)
 
 	user := models.User{
@@ -1061,7 +1061,7 @@ func aTestPredictGraph(t *testing.T) {
 	assert.NotEmpty(t, predictedGraph.Paths)
 }
 
-func aTestPredictGraph_BadCase(t *testing.T) {
+func TestPredictGraph_BadCase(t *testing.T) {
 	ts := suite.New(t)
 
 	user := models.User{
